@@ -29,5 +29,7 @@
       "name": "EMAIL",
       "allowed_sender_addresses": ["noreply@vprint.401.moe"]
     }
-  ]
+  ],
+  "durable_objects": { "bindings": [{ "name": "NOTIFICATIONS", "class_name": "UserNotifications" }] },
+  "migrations": [{ "tag": "notifications-v1", "new_sqlite_classes": ["UserNotifications"] }]
 }

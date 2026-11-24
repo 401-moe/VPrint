@@ -7,6 +7,7 @@ declare global {
   namespace Cloudflare {
     interface Env {
       DB: D1Database;
+      NOTIFICATIONS: DurableObjectNamespace;
       BETTER_AUTH_SECRET: string;
       BETTER_AUTH_URL: string;
       EMAIL: SendEmail;

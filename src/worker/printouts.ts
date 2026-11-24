@@ -1,3 +1,4 @@
+import { publishPrint } from "./notifications";
 import { Hono } from "hono";
 import { decodePrintText, maxPrintBytes } from "../shared/print-text";
 import { getCurrentUser } from "./auth";
@@ -141,6 +142,9 @@ printoutsRoutes.post("/cli/contests/:contestId/prints", async (context) => {
         AND g.id = ? AND g.revokedAt IS NULL AND g.expiresAt > unixepoch()
     `).bind(identity.user.id, contestId, requestId, identity.grantId),
   ]);
+  if (inserted.meta.changes === 1) {
+    await publishPrint(context.env, { contestId, printId: id }).catch(() => console.warn("Print notification delivery failed"));
+  }
   const retry = readback.results[0];
   if (retry) return context.json(retry, inserted.meta.changes === 1 ? 201 : 200);
   return context.json({ error: "contest not found" }, 403);

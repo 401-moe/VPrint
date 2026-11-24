@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
-import type { AuthEnvironment } from "./auth";
+import type { Environment } from "./index";
+import { invalidateSubscriptions } from "./notifications";
 import { getCurrentUser } from "./auth";
 
 interface MemberRow {
@@ -9,7 +10,7 @@ interface MemberRow {
 }
 
 type TeamManagementContext = {
-  Bindings: AuthEnvironment;
+  Bindings: Environment;
 };
 
 function teamId(value: string) {
@@ -142,6 +143,7 @@ teamManagementRoutes.delete("/teams/:teamId/members/:memberUserId", async (conte
   ]);
   const authorized = results[0].meta.changes === 1;
   if (!authorized) return context.json({ error: "owner role required" }, 403);
+  await invalidateSubscriptions(context.env, memberUserId).catch(() => undefined);
 
   return context.json({
     invitationToken: token,
@@ -162,5 +164,6 @@ teamManagementRoutes.delete("/teams/:teamId/membership", async (context) => {
     .run();
   if (result.meta.changes === 0) return context.json({ error: "team not found" }, 404);
 
+  await invalidateSubscriptions(context.env, user.id).catch(() => undefined);
   return context.json({ leftTeamId: requestedTeamId });
 });

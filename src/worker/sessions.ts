@@ -1,3 +1,4 @@
+import { invalidateSubscriptions } from "./notifications";
 import { Hono } from "hono";
 import type { Environment } from "./index";
 import { createAuth } from "./auth";
@@ -39,5 +40,6 @@ sessionRoutes.delete("/account/sessions/:type/:id", async c => {
     : "UPDATE vprint_cli_grant SET revokedAt = unixepoch(), refreshTokenHash = NULL WHERE id = ? AND userId = ? AND revokedAt IS NULL RETURNING id";
   const result = await c.env.DB.prepare(query).bind(id, identity.user.id).first();
   if (!result) return c.json({ error: "session not found" }, 404);
+  if (type === "web") await invalidateSubscriptions(c.env, identity.user.id).catch(() => undefined);
   return c.json({ current: type === "web" && id === identity.session.id });
 });

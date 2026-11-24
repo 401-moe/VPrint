@@ -1,3 +1,5 @@
+export { UserNotifications } from "./notifications";
+import { invalidateSubscriptions, notificationRoutes } from "./notifications";
 import { Hono } from "hono";
 import { createAuth, getCurrentUser, type AuthEnvironment } from "./auth";
 import { contestLifecycleRoutes } from "./contest-lifecycle";
@@ -9,6 +11,7 @@ import { captureDeviceRequest, decideDeviceRequest, getDeviceRequest } from "./c
 import { cliToken, getCliMe, logoutCli } from "./cli";
 
 export interface Environment extends AuthEnvironment {
+  NOTIFICATIONS: DurableObjectNamespace;
   ASSETS: { fetch: (request: Request) => Promise<Response> };
 }
 
@@ -23,6 +26,15 @@ app.get("/api/auth/callback/github", context => {
   return createAuth(context.env).handler(new Request(url, context.req.raw));
 });
 
+app.post("/api/auth/sign-out", async c => {
+  const auth = createAuth(c.env);
+  const identity = await auth.api.getSession({ headers: c.req.raw.headers });
+  const result = await auth.handler(c.req.raw);
+  if (result.ok && identity) await invalidateSubscriptions(c.env, identity.user.id).catch(() => undefined);
+  return result;
+});
+
+app.route("/api", notificationRoutes);
 app.all("/api/auth/*", (context) => {
   const auth = createAuth(context.env);
   return auth.handler(context.req.raw);
