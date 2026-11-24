@@ -7,6 +7,7 @@ test("device authorization waits for the signed-in member to check the code and 
     json: { userCode: "BCDF-GHJK", hostname: "主机 07", os: "win32", scope: "offline_access vprint:teams:read vprint:print" },
   }));
   await page.route("**/api/cli/device/decision", route => {
+    expect(route.request().headers()["x-vprint-device-decision"]).toBe("1");
     decisions.push(route.request().postDataJSON());
     return route.fulfill({ json: { success: true } });
   });

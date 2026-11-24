@@ -18,6 +18,7 @@ interface Contest {
   id: string;
   name: string;
   createdAt: number;
+  teamId?: string;
 }
 
 interface WorkspaceData {
@@ -26,6 +27,11 @@ interface WorkspaceData {
   contests: Contest[];
   contest: Contest | null;
 }
+
+type WorkspaceState =
+  | { status: "loading" }
+  | { status: "denied" }
+  | { status: "ready"; data: WorkspaceData };
 
 const emptyWorkspace: WorkspaceData = {
   teams: [],
@@ -66,37 +72,49 @@ export function Workspace({
   pending: boolean;
   signOut: () => void;
 }) {
-  const [workspace, setWorkspace] = useState(emptyWorkspace);
+  const [workspaceState, setWorkspaceState] = useState<WorkspaceState>({
+    status: "loading",
+  });
+  const workspace = workspaceState.status === "ready" ? workspaceState.data : emptyWorkspace;
   const [teamName, setTeamName] = useState("");
   const [contestName, setContestName] = useState("");
+  const [showTeamForm, setShowTeamForm] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [workspacePending, setWorkspacePending] = useState(false);
   const [invitationUrl, setInvitationUrl] = useState("");
 
-  const loadWorkspace = useCallback(async (path = "/api/workspace") => {
+  const loadWorkspace = useCallback(async () => {
+    const contestId = window.location.pathname.match(/^\/contest\/([a-f0-9-]{36})$/)?.[1];
     try {
-      const data = (await requestJson(path)) as unknown as WorkspaceData;
-      setWorkspace(data);
+      const query = contestId ? `?contestId=${contestId}` : "";
+      const data = (await requestJson(`/api/workspace${query}`)) as unknown as WorkspaceData;
+      setWorkspaceState({ status: "ready", data });
       const selected = data.teams.find((team) => team.id === data.selectedTeamId);
       if (selected) setInvitationUrl(selected.invitationUrl);
-      return true;
     } catch (cause) {
-      setWorkspaceError(cause instanceof Error ? cause.message : "请求失败，请稍后重试。");
-      return false;
+      setWorkspaceState({ status: "denied" });
     }
   }, []);
 
   useEffect(() => {
     const invitationToken = window.location.pathname.match(/^\/invite\/([a-f0-9]{32})$/)?.[1];
-    void loadWorkspace();
-    if (!invitationToken) return;
+    if (!invitationToken) {
+      void loadWorkspace();
+      return;
+    }
 
     requestJson(`/api/team-invitations/${invitationToken}/join`, {
       method: "POST",
       body: "{}",
     })
+      .then((team) => requestJson(`/api/teams/${(team as { id: string }).id}/selection`, {
+        method: "PUT",
+        body: "{}",
+      }))
       .then(() => loadWorkspace())
       .catch((cause: unknown) => {
+        window.history.replaceState(null, "", "/");
+        void loadWorkspace();
         setWorkspaceError(
           cause instanceof Error && cause.message === "authentication required"
             ? "请登录后使用邀请链接。"
@@ -117,7 +135,12 @@ export function Workspace({
       })) as { id: string; name: string; role: string; invitationUrl: string };
       setTeamName("");
       setInvitationUrl(team.invitationUrl);
+      await requestJson(`/api/teams/${team.id}/selection`, {
+        method: "PUT",
+        body: "{}",
+      });
       await loadWorkspace();
+      setShowTeamForm(false);
     } catch (cause) {
       setWorkspaceError(cause instanceof Error ? cause.message : "创建队伍失败。");
     } finally {
@@ -163,9 +186,58 @@ export function Workspace({
     }
   }
 
+  async function returnToTeam() {
+    window.history.pushState({}, "", "/");
+    await requestJson("/api/teams/" + workspace.contest?.teamId + "/selection", {
+      method: "PUT",
+      body: "{}",
+    }).catch(() => undefined);
+    await loadWorkspace();
+  }
+
   const selectedTeam = workspace.teams.find((team) => team.id === workspace.selectedTeamId);
   const busy = pending || workspacePending;
   const displayedError = workspaceError ?? error;
+
+  if (workspaceState.status === "denied") {
+    return (
+      <section className="workspace-card" aria-labelledby="denied-title">
+        <h1 className="title" id="denied-title">
+          无法访问比赛
+        </h1>
+        <p className="member-name">这份比赛不属于你的队伍。</p>
+        <button className="button" type="button" onClick={returnToTeam}>
+          返回队伍
+        </button>
+      </section>
+    );
+  }
+
+  if (workspaceState.status === "loading") {
+    return (
+      <section className="workspace-card" aria-busy="true">
+        <h1 className="title">正在读取工作台…</h1>
+      </section>
+    );
+  }
+
+  if (workspace.contest) {
+    return (
+      <section className="workspace-card" aria-labelledby="contest-title">
+        <header className="workspace-header">
+          <div>
+            <h1 className="title" id="contest-title">
+              {workspace.contest.name}
+            </h1>
+            <p className="member-name">{formatTimestamp(workspace.contest.createdAt)}</p>
+          </div>
+          <button className="button secondary" type="button" onClick={returnToTeam}>
+            返回队伍
+          </button>
+        </header>
+      </section>
+    );
+  }
 
   return (
     <section className="workspace-card" aria-labelledby="workspace-title">
@@ -181,7 +253,7 @@ export function Workspace({
         </button>
       </header>
 
-      {workspace.teams.length === 0 ? (
+      {workspace.teams.length === 0 || showTeamForm ? (
         <form className="fields" onSubmit={createTeam}>
           <label className="field">
             队伍名称
@@ -195,6 +267,16 @@ export function Workspace({
           <button className="button" type="submit" disabled={busy}>
             创建队伍
           </button>
+          {workspace.teams.length > 0 && (
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => setShowTeamForm(false)}
+              disabled={busy}
+            >
+              取消
+            </button>
+          )}
         </form>
       ) : (
         <>
@@ -214,10 +296,19 @@ export function Workspace({
               </select>
             </label>
             <p className="role">{selectedTeam?.role === "owner" ? "队长" : "队员"}</p>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => setShowTeamForm(true)}
+              disabled={busy}
+            >
+              新建队伍
+            </button>
           </div>
 
           {selectedTeam && (
             <TeamManagement
+              key={selectedTeam.id}
               teamId={selectedTeam.id}
               role={selectedTeam.role}
               invitationUrl={invitationUrl}
