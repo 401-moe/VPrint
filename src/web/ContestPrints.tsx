@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { SourceReader } from "./SourceReader";
+
 interface PrintRecord {
   id: string;
   filename: string;
@@ -61,7 +63,7 @@ export function PrintPage({ contestId, printId }: { contestId: string; printId: 
       {detail && <>
         <h1 className="title">{detail.filename}</h1>
         <time dateTime={new Date(detail.createdAt).toISOString()}>{new Date(detail.createdAt).toLocaleString("zh-CN")}</time>
-        <pre style={{ overflowX: "auto" }}><code>{detail.content}</code></pre>
+        <SourceReader filename={detail.filename} source={detail.content} />
       </>}
     </article>
   );
