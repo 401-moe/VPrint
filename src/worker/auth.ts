@@ -12,7 +12,7 @@ export interface AuthEnvironment {
   DB: D1Database;
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;
-  EMAIL: SendEmail;
+  EMAIL?: SendEmail;
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
 }
