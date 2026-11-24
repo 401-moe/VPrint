@@ -1,6 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "vprint",
+  "name": "vprint-preview",
+  "routes": [{ "pattern": "vprint.401.moe", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-11-20",
   "assets": {
