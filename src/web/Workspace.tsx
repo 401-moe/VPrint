@@ -1,5 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
+import { PrintList, PrintPage } from "./ContestPrints";
+
 interface Member {
   id: string;
   email: string;
@@ -83,7 +85,7 @@ export function Workspace({
   const [invitationUrl, setInvitationUrl] = useState("");
 
   const loadWorkspace = useCallback(async () => {
-    const contestId = window.location.pathname.match(/^\/contest\/([a-f0-9-]{36})$/)?.[1];
+    const contestId = window.location.pathname.match(/^\/contest\/([a-f0-9-]{36})(?:\/print\/[a-f0-9-]{36})?$/)?.[1];
     try {
       const query = contestId ? `?contestId=${contestId}` : "";
       const data = (await requestJson(`/api/workspace${query}`)) as unknown as WorkspaceData;
@@ -216,6 +218,8 @@ export function Workspace({
   }
 
   if (workspace.contest) {
+    const printId = window.location.pathname.match(/\/print\/([a-f0-9-]{36})$/)?.[1];
+    if (printId) return <PrintPage contestId={workspace.contest.id} printId={printId} />;
     return (
       <section className="workspace-card" aria-labelledby="contest-title">
         <header className="workspace-header">
@@ -229,6 +233,7 @@ export function Workspace({
             返回队伍
           </button>
         </header>
+        <PrintList contestId={workspace.contest.id} />
       </section>
     );
   }
