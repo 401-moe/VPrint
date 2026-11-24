@@ -18,14 +18,14 @@ test("a member signs up, reloads, signs out, fails once, then signs in again", a
   await page.getByLabel("邮箱").fill(email);
   await page.getByLabel("密码").fill("correct horse battery staple");
   await page.getByRole("button", { name: "创建账号" }).click();
-  await expect(page.getByRole("heading", { name: "已登录" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "工作台" })).toBeVisible();
   const memberId = await page.evaluate(async () => {
     const response = await fetch("/api/me");
     return (await response.json()) as { id: string };
   });
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: "已登录" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "工作台" })).toBeVisible();
   await expect(page.getByText(email)).toBeVisible();
   await expect
     .poll(async () =>
