@@ -10,7 +10,7 @@ VPrint 是 XCPC 队伍做 VP 时用的电子打印服务。比赛主机把当前
 pnpm install --frozen-lockfile
 pnpm run build
 pnpm exec wrangler d1 migrations apply DB --local
-pnpm exec wrangler dev
+pnpm run dev
 ```
 
 启动 Wrangler 前，在本机的 `.dev.vars` 中设置 `BETTER_AUTH_URL=http://127.0.0.1:8787` 和 `BETTER_AUTH_SECRET`。后者使用本地独立生成的随机值，例如用 `openssl rand -hex 32` 生成。浏览器打开 Wrangler 显示的地址即可使用本地数据库。

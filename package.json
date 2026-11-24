@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "wrangler dev --infer-origin-from-routes=false",
     "build": "tsc -p tsconfig.worker.json --noEmit && tsc --noEmit && vite build",
     "check": "tsc -p tsconfig.worker.json --noEmit && tsc --noEmit",
     "test:api": "vitest --config vitest.worker.ts",

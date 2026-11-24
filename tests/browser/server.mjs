@@ -15,6 +15,7 @@ const migrationArgs = [
 ];
 const workerArgs = [
   "dev",
+  "--infer-origin-from-routes=false",
   "--port",
   String(port),
   "--persist-to",

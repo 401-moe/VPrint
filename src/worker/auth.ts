@@ -11,11 +11,7 @@ export function createAuth(env: AuthEnvironment) {
   return betterAuth({
     database: env.DB,
     secret: env.BETTER_AUTH_SECRET,
-    baseURL: {
-      allowedHosts: [new URL(env.BETTER_AUTH_URL).host],
-      protocol: "auto",
-      fallback: env.BETTER_AUTH_URL,
-    },
+    baseURL: env.BETTER_AUTH_URL,
     emailAndPassword: {
       enabled: true,
     },
