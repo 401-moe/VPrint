@@ -115,29 +115,21 @@ teamsRoutes.post("/team-invitations/:token/join", async (context) => {
   const user = await requireUser(context);
   if (!user) return context.json({ error: "authentication required" }, 401);
   const token = context.req.param("token");
-  const team = await context.env.DB.prepare(
-    `
-      SELECT team.id, team.name, team.createdAt
-      FROM team
-      WHERE team.invitationToken = ?
-    `,
-  )
-    .bind(token)
-    .first<TeamRow>();
-  if (!team) return context.json({ error: "invitation not found" }, 404);
-
-  const result = await context.env.DB.prepare(
-    `
+  const [, lookup] = await context.env.DB.batch([
+    context.env.DB.prepare(`
       INSERT INTO team_member (teamId, userId, role, createdAt)
-      VALUES (?, ?, 'member', ?)
+      SELECT id, ?, 'member', ? FROM team WHERE invitationToken = ?
       ON CONFLICT(teamId, userId) DO NOTHING
-    `,
-  )
-    .bind(team.id, user.id, Date.now())
-    .run();
-  if (!result.success) return context.json({ error: "failed to join team" }, 500);
-
-  return context.json({ id: team.id, name: team.name, role: "member" });
+    `).bind(user.id, Date.now(), token),
+    context.env.DB.prepare(`
+      SELECT t.id, t.name, m.role FROM team t
+      JOIN team_member m ON m.teamId = t.id
+      WHERE t.invitationToken = ? AND m.userId = ?
+    `).bind(token, user.id),
+  ]);
+  const team = lookup.results[0];
+  if (!team) return context.json({ error: "invitation not found" }, 404);
+  return context.json(team);
 });
 
 teamsRoutes.post("/teams/:teamId/contests", async (context) => {
@@ -280,7 +272,8 @@ teamsRoutes.get("/workspace", async (context) => {
       name: team.name,
       role: team.role,
       createdAt: team.createdAt,
-      invitationUrl: invitationUrl(context.env, team.invitationToken ?? ""),
+      invitationUrl:
+        team.role === "owner" ? invitationUrl(context.env, team.invitationToken ?? "") : "",
     })),
     selectedTeamId: selectedTeam.id,
     contests: contests.results,

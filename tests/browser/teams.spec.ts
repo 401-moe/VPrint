@@ -15,6 +15,7 @@ test("a signed-in owner creates a team and a contest, then a teammate joins by i
   await page.getByRole("button", { name: "创建队伍" }).click();
   await expect(page.getByRole("heading", { name: "火苗" })).toBeVisible();
   await expect(page.getByText("队长")).toBeVisible();
+  await page.getByRole("button", { name: "队伍设置" }).click();
   await expect(page.getByRole("textbox", { name: "邀请链接" })).toHaveValue(
     /\/invite\/[a-f0-9]{32}$/,
   );

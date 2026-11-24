@@ -76,6 +76,32 @@ async function workspace(cookie: string, contestId?: string) {
   );
 }
 
+async function members(cookie: string, teamId: string) {
+  return worker.fetch(request(`/api/teams/${teamId}/members`, { headers: { cookie } }), env);
+}
+
+async function resetInvitation(cookie: string, teamId: string) {
+  return worker.fetch(request(`/api/teams/${teamId}/invitation`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie, origin: loopbackOrigin },
+    body: "{}",
+  }), env);
+}
+
+async function removeMember(cookie: string, teamId: string, memberUserId: string) {
+  return worker.fetch(request(`/api/teams/${teamId}/members/${memberUserId}`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json", cookie, origin: loopbackOrigin },
+  }), env);
+}
+
+async function leaveTeam(cookie: string, teamId: string) {
+  return worker.fetch(request(`/api/teams/${teamId}/membership`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json", cookie, origin: loopbackOrigin },
+  }), env);
+}
+
 beforeAll(async () => {
   await applyD1Migrations(env.DB, inject("d1Migrations"));
 });
@@ -311,4 +337,269 @@ test("an outside account cannot open a contest or create one for the team", asyn
 
   const outsiderDeepLink = await workspace(outsideCookie, contest.id);
   expect(outsiderDeepLink.status).toBe(403);
+});
+
+test("only the owner resets an invitation, and existing members keep their roles", async () => {
+  const suffix = Date.now();
+  const [{ cookie: ownerCookie }, { cookie: memberCookie }] = await Promise.all([
+    signUp({
+      email: `reset-owner-${suffix}@vprint.example`,
+      password: "correct horse battery staple",
+      name: "甲",
+    }),
+    signUp({
+      email: `reset-member-${suffix}@vprint.example`,
+      password: "correct horse battery staple",
+      name: "乙",
+    }),
+  ]);
+  const team = await createTeam(ownerCookie, "重置邀请");
+  await join(memberCookie, team.invitationToken);
+
+  const memberReset = await resetInvitation(memberCookie, team.id);
+  expect(memberReset.status).toBe(403);
+
+  const reset = await resetInvitation(ownerCookie, team.id);
+  expect(reset.status).toBe(200);
+  const resetBody = (await reset.json()) as {
+    invitationUrl: string;
+    invitationToken: string;
+  };
+  expect(resetBody.invitationToken === team.invitationToken).toBe(false);
+  expect(resetBody.invitationUrl).toBe(`${loopbackOrigin}/invite/${resetBody.invitationToken}`);
+
+  const oldJoin = await join(memberCookie, team.invitationToken);
+  expect(oldJoin.status).toBe(404);
+  const ownerWorkspace = await workspace(ownerCookie);
+  const ownerBody = (await ownerWorkspace.json()) as {
+    teams: { id: string; role: string; invitationUrl: string }[];
+  };
+  expect(ownerBody.teams.find((item) => item.id === team.id)?.role).toBe("owner");
+});
+
+test("the owner sees teammates, while members receive a redacted invitation", async () => {
+  const suffix = Date.now();
+  const [{ cookie: ownerCookie }, { cookie: memberCookie }] = await Promise.all([
+    signUp({
+      email: `list-owner-${suffix}@vprint.example`,
+      password: "correct horse battery staple",
+      name: "甲",
+    }),
+    signUp({
+      email: `list-member-${suffix}@vprint.example`,
+      password: "correct horse battery staple",
+      name: "乙",
+    }),
+  ]);
+  const team = await createTeam(ownerCookie, "队员列表");
+  await join(memberCookie, team.invitationToken);
+
+  const ownerId = ((await (
+    await worker.fetch(request("/api/me", { headers: { cookie: ownerCookie } }), env)
+  ).json()) as { id: string }).id;
+  const memberId = ((await (
+    await worker.fetch(request("/api/me", { headers: { cookie: memberCookie } }), env)
+  ).json()) as { id: string }).id;
+
+  const outsideMemberList = await members(memberCookie, team.id);
+  expect(outsideMemberList.status).toBe(403);
+
+  const memberList = await members(ownerCookie, team.id);
+  expect(memberList.status).toBe(200);
+  const listBody = (await memberList.json()) as {
+    members: { id: string; name: string; role: string }[];
+  };
+  expect(listBody.members).toEqual([
+    { id: ownerId, name: "甲", role: "owner" },
+    { id: memberId, name: "乙", role: "member" },
+  ]);
+
+  const memberWorkspace = await workspace(memberCookie);
+  const workspaceBody = (await memberWorkspace.json()) as {
+    teams: { id: string; invitationUrl: string }[];
+  };
+  expect(workspaceBody.teams.find((item) => item.id === team.id)?.invitationUrl).toBe("");
+});
+
+test("the owner removes a member and resets the invitation together", async () => {
+  const suffix = Date.now();
+  const [{ cookie: ownerCookie }, { cookie: memberCookie }, { cookie: outsiderCookie }] =
+    await Promise.all([
+      signUp({
+        email: `remove-owner-${suffix}@vprint.example`,
+        password: "correct horse battery staple",
+        name: "甲",
+      }),
+      signUp({
+        email: `remove-member-${suffix}@vprint.example`,
+        password: "correct horse battery staple",
+        name: "乙",
+      }),
+      signUp({
+        email: `remove-outsider-${suffix}@vprint.example`,
+        password: "correct horse battery staple",
+        name: "丙",
+      }),
+    ]);
+  const team = await createTeam(ownerCookie, "移除队员");
+  await join(memberCookie, team.invitationToken);
+  const memberId = ((await (
+    await worker.fetch(request("/api/me", { headers: { cookie: memberCookie } }), env)
+  ).json()) as { id: string }).id;
+  const ownerId = ((await (
+    await worker.fetch(request("/api/me", { headers: { cookie: ownerCookie } }), env)
+  ).json()) as { id: string }).id;
+
+  const memberSelfRemoval = await removeMember(memberCookie, team.id, memberId);
+  expect(memberSelfRemoval.status).toBe(400);
+  const memberRemovingOwner = await removeMember(memberCookie, team.id, ownerId);
+  expect(memberRemovingOwner.status).toBe(403);
+  const ownerSelfRemoval = await removeMember(ownerCookie, team.id, ownerId);
+  expect(ownerSelfRemoval.status).toBe(400);
+
+  expect((await leaveTeam(ownerCookie, team.id)).ok).toBe(false);
+  expect((await removeMember(ownerCookie, team.id, "absent")).ok).toBe(false);
+  expect(await env.DB.prepare("SELECT invitationToken FROM team WHERE id = ?").bind(team.id).first("invitationToken")).toBe(team.invitationToken);
+
+  const removal = await removeMember(ownerCookie, team.id, memberId);
+  expect(removal.status).toBe(200);
+  expect(
+    ((await removal.json()) as { invitationToken: string }).invitationToken ===
+      team.invitationToken,
+  ).toBe(false);
+
+  const oldInvitation = await join(memberCookie, team.invitationToken);
+  expect(oldInvitation.status).toBe(404);
+  const removedWorkspace = await workspace(memberCookie, team.id);
+  expect(removedWorkspace.status).toBe(403);
+
+  const reset = (await (await resetInvitation(ownerCookie, team.id)).json()) as {
+    invitationToken: string;
+  };
+  const newcomerJoin = await join(outsiderCookie, reset.invitationToken);
+  expect(newcomerJoin.status).toBe(200);
+});
+
+test("a member can leave while the invitation keeps inviting others", async () => {
+  const suffix = Date.now();
+  const [{ cookie: ownerCookie }, { cookie: memberCookie }, { cookie: newcomerCookie }] =
+    await Promise.all([
+      signUp({
+        email: `leave-owner-${suffix}@vprint.example`,
+        password: "correct horse battery staple",
+        name: "甲",
+      }),
+      signUp({
+        email: `leave-member-${suffix}@vprint.example`,
+        password: "correct horse battery staple",
+        name: "乙",
+      }),
+      signUp({
+        email: `leave-newcomer-${suffix}@vprint.example`,
+        password: "correct horse battery staple",
+        name: "丙",
+      }),
+    ]);
+  const team = await createTeam(ownerCookie, "主动退队");
+  await join(memberCookie, team.invitationToken);
+
+  const leave = await leaveTeam(memberCookie, team.id);
+  expect(leave.status).toBe(200);
+  const leftWorkspace = await workspace(memberCookie);
+  expect(((await leftWorkspace.json()) as { teams: unknown[] }).teams).toEqual([]);
+
+  const nextJoin = await join(newcomerCookie, team.invitationToken);
+  expect(nextJoin.status).toBe(200);
+});
+
+test("a concurrent invitation reset and join leave one consistent membership state", async () => {
+  const suffix = Date.now();
+  const [{ cookie: ownerCookie }, { cookie: memberCookie }] = await Promise.all([
+    signUp({
+      email: `race-owner-${suffix}@vprint.example`,
+      password: "correct horse battery staple",
+      name: "甲",
+    }),
+    signUp({
+      email: `race-member-${suffix}@vprint.example`,
+      password: "correct horse battery staple",
+      name: "乙",
+    }),
+  ]);
+  const team = await createTeam(ownerCookie, "并发入队");
+  const memberId = ((await (
+    await worker.fetch(request("/api/me", { headers: { cookie: memberCookie } }), env)
+  ).json()) as { id: string }).id;
+
+  const [, oldTokenJoin] = await Promise.all([
+    env.DB.prepare("UPDATE team SET invitationToken = ? WHERE id = ?")
+      .bind("1".repeat(32), team.id)
+      .run(),
+    join(memberCookie, team.invitationToken),
+  ]);
+  const membership = await env.DB.prepare(
+    "SELECT role FROM team_member WHERE teamId = ? AND userId = ?",
+  )
+    .bind(team.id, memberId)
+    .first<{ role: string }>();
+
+  if (oldTokenJoin.status === 200) {
+    expect(membership?.role).toBe("member");
+  } else {
+    expect(oldTokenJoin.status).toBe(404);
+    expect(membership).toBeNull();
+  }
+});
+
+test("joining rechecks the token after an earlier reset in the same SQL statement", async () => {
+  const suffix = Date.now();
+  const { cookie: ownerCookie } = await signUp({
+    email: `post-reset-owner-${suffix}@vprint.example`,
+    password: "correct horse battery staple",
+    name: "甲",
+  });
+  const { cookie: memberCookie } = await signUp({
+    email: `post-reset-member-${suffix}@vprint.example`,
+    password: "correct horse battery staple",
+    name: "乙",
+  });
+  const team = await createTeam(ownerCookie, "并发入队");
+  const resetResponse = await resetInvitation(ownerCookie, team.id);
+  expect(resetResponse.status).toBe(200);
+
+  const oldTokenJoin = await join(memberCookie, team.invitationToken);
+  expect(oldTokenJoin.status).toBe(404);
+
+  const membership = await env.DB.prepare(
+    "SELECT role FROM team_member WHERE teamId = ? AND userId = ?",
+  )
+    .bind(
+      team.id,
+      ((await (
+        await worker.fetch(request("/api/me", { headers: { cookie: memberCookie } }), env)
+      ).json()) as { id: string }).id,
+    )
+    .first<{ role: string }>();
+  expect(membership).toBeNull();
+});
+
+test("cross-origin browser form posts cannot mutate team management routes", async () => {
+  const suffix = Date.now();
+  const { cookie } = await signUp({
+    email: `csrf-owner-${suffix}@vprint.example`,
+    password: "correct horse battery staple",
+    name: "甲",
+  });
+  const team = await createTeam(cookie, "跨源防护");
+
+  const crossOriginReset = await worker.fetch(request(`/api/teams/${team.id}/invitation`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      cookie,
+      origin: "https://attacker.example",
+    },
+    body: "{}",
+  }), env);
+  expect(crossOriginReset.status).toBe(403);
 });

@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { TeamManagement } from "./TeamManagement";
 
 interface Member {
   id: string;
@@ -96,7 +97,11 @@ export function Workspace({
     })
       .then(() => loadWorkspace())
       .catch((cause: unknown) => {
-        setWorkspaceError(cause instanceof Error ? cause.message : "邀请链接无效。");
+        setWorkspaceError(
+          cause instanceof Error && cause.message === "authentication required"
+            ? "请登录后使用邀请链接。"
+            : "邀请链接无效。",
+        );
       });
   }, [loadWorkspace]);
 
@@ -211,24 +216,15 @@ export function Workspace({
             <p className="role">{selectedTeam?.role === "owner" ? "队长" : "队员"}</p>
           </div>
 
-          <div className="invitation">
-            <label className="field">
-              邀请链接
-              <input
-                readOnly
-                value={invitationUrl}
-                onFocus={(event) => event.target.select()}
-              />
-            </label>
-            <button
-              className="button secondary"
-              type="button"
-              onClick={() => navigator.clipboard.writeText(invitationUrl)}
-              disabled={!invitationUrl}
-            >
-              复制邀请
-            </button>
-          </div>
+          {selectedTeam && (
+            <TeamManagement
+              teamId={selectedTeam.id}
+              role={selectedTeam.role}
+              invitationUrl={invitationUrl}
+              onInvitationChange={setInvitationUrl}
+              onLeftTeam={() => void loadWorkspace()}
+            />
+          )}
 
           <form className="inline-form" onSubmit={createContest}>
             <label className="field">

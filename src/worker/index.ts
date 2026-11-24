@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { createAuth, getCurrentUser, type AuthEnvironment } from "./auth";
+import { teamManagementRoutes } from "./team-management";
 import { teamsRoutes } from "./teams";
 
 export interface Environment extends AuthEnvironment {
@@ -14,6 +15,7 @@ app.all("/api/auth/*", (context) => {
 });
 
 app.route("/api", teamsRoutes);
+app.route("/api", teamManagementRoutes);
 
 app.get("/api/me", async (context) => {
   const user = await getCurrentUser(context.env, context.req.raw.headers);
