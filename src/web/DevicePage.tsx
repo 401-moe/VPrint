@@ -39,7 +39,7 @@ export function DevicePage({ email }: { email: string }) {
     try {
       const response = await fetch("/api/cli/device/decision", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "x-vprint-device-decision": "1" },
         body: JSON.stringify({ userCode: device.userCode, approve, keepSignedIn: approve && remember }),
       });
       if (!response.ok) throw new Error(response.status === 401 ? "请刷新页面并重新登录。" : "授权未完成，请核对短码是否仍有效。");
