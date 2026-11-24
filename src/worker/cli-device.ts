@@ -60,7 +60,7 @@ export async function captureDeviceRequest(
     return context.json({ error: "invalid_request" }, 400);
   }
 
-  const response = await createAuth(context.env, true).handler(context.req.raw);
+  const response = await createAuth(context.env, { cliProtocol: true }).handler(context.req.raw);
   if (!response.ok) return response;
 
   const body = await response.clone().json() as { device_code?: string; user_code?: string };

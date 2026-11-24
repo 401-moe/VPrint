@@ -310,3 +310,33 @@ test("a new mailbox owner can use an email OTP as the first sign-in method", asy
   expect(noPassword.status).toBe(401);
   expect(cookies(noPassword)).toBe("");
 });
+
+test("binding an existing account with an email code cannot register a new account", async () => {
+  const email = "bind-choice@vprint.example";
+  const messages: EmailMessage[] = [];
+  const bindings = { ...env, EMAIL: { send: async (message: EmailMessage) => { messages.push(message); } } };
+  const send = "/api/auth/email-otp/send-verification-otp";
+  const signin = "/api/auth/sign-in/email-otp";
+  const post = (path: string, data: object, existingOnly: boolean) => {
+    const headers = new Headers({ origin: loopbackOrigin, "content-type": "application/json" });
+    if (existingOnly) headers.set("x-vprint-existing-account", "1");
+    return worker.fetch(request(path, { method: "POST", headers, body: JSON.stringify(data) }), bindings);
+  };
+  const requestCode = { email, type: "sign-in" };
+  const lastCode = () => messages.at(-1)?.text.match(/\b\d{6}\b/)?.[0];
+  expect((await post(send, requestCode, true)).ok).toBe(true);
+  expect(messages).toHaveLength(0);
+  expect((await post(send, requestCode, false)).ok).toBe(true);
+  const valid = lastCode();
+  expect(valid).toBeDefined();
+  expect((await post(signin, { email, otp: valid }, true)).ok).toBe(false);
+  expect(await env.DB.prepare("SELECT id FROM user WHERE email = ?").bind(email).first()).toBeNull();
+  expect((await post(send, requestCode, false)).ok).toBe(true);
+  const created = await post(signin, { email, otp: lastCode() }, false);
+  expect(created.ok).toBe(true);
+  const original = (await created.json() as { user: { id: string } }).user;
+  expect((await post(send, requestCode, true)).ok).toBe(true);
+  const restored = await post(signin, { email, otp: lastCode() }, true);
+  expect(restored.ok).toBe(true);
+  expect((await restored.json() as { user: { id: string } }).user.id).toBe(original.id);
+});

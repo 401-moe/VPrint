@@ -3,8 +3,9 @@ import type { AuthEnvironment } from "./auth";
 
 const otpSender = "noreply@vprint.401.moe";
 
-export function createEmailOtpPlugin(env: AuthEnvironment) {
+export function createEmailOtpPlugin(env: AuthEnvironment, existingAccountOnly = false) {
   return emailOTP({
+    disableSignUp: existingAccountOnly,
     sendVerificationOTP: async ({ email, otp, type }) => {
       if (type !== "sign-in") {
         throw new Error(`unsupported email OTP type: ${type}`);
