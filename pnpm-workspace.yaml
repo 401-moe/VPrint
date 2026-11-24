@@ -1,5 +1,6 @@
 packages:
   - .
+  - cli
 allowBuilds:
   esbuild: false
   workerd: false
