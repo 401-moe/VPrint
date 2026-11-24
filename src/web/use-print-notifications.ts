@@ -43,11 +43,17 @@ function connect(session: string, receive: (message: TabNotice) => void): Channe
 export function usePrintNotifications(contest: string, reader: boolean, receive: (notice: TabNotice) => void) {
   const handler = useRef(receive);
   handler.current = receive;
+  const readMode = useRef(reader);
+  readMode.current = reader;
+  const refresh = useRef<() => void>(() => {});
+  useEffect(() => { refresh.current(); }, [reader]);
   useEffect(() => {
+    if (!contest) return;
     let active = true, channel: Channel | undefined;
     let focusedAt = document.hasFocus() ? Date.now() : 0;
     let epoch = 0;
-    const update = () => channel?.update({ contest, reader, visible: document.visibilityState === "visible", focusedAt });
+    const update = () => channel?.update({ contest, reader: readMode.current, visible: document.visibilityState === "visible", focusedAt });
+    refresh.current = update;
     const focus = () => { focusedAt = Date.now(); update(); };
     function stop() { epoch++; channel?.close(); channel = undefined; }
     async function start() {
@@ -71,11 +77,11 @@ export function usePrintNotifications(contest: string, reader: boolean, receive:
     const restored = (event: PageTransitionEvent) => { if (event.persisted) void start(); };
     window.addEventListener("pageshow", restored);
     return () => {
-      active = false; stop();
+      active = false; refresh.current = () => {}; stop();
       window.removeEventListener("focus", focus);
       document.removeEventListener("visibilitychange", update);
       window.removeEventListener("pagehide", stop);
       window.removeEventListener("pageshow", restored);
     };
-  }, [contest, reader]);
+  }, [contest]);
 }

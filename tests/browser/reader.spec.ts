@@ -39,3 +39,26 @@ for (const width of [390, 1280]) {
     await expect(page.getByRole("list", { name: "打印件" })).toHaveCount(0);
   });
 }
+
+test("opening a print and returning keeps the contest document and its subscription alive", async ({ page }) => {
+  const list = "/contest/" + contestId;
+  const reader = list + "/print/" + printId;
+  const record = { id: printId, filename: "A.cpp", createdAt: 1000 };
+  await page.route("**/api/me", route => route.fulfill({ json: { id: "member", name: "甲", email: "reader@example.test" } }));
+  await page.route("**/api/workspace?**", route => route.fulfill({ json: { teams: [], contests: [], selectedTeamId: null, contest: { id: contestId, name: "训练" } } }));
+  await page.route("**/api/contests/*/prints", route => route.fulfill({ json: { printouts: [record] } }));
+  await page.route("**/api/contests/*/prints/*", route => route.fulfill({ json: { ...record, content } }));
+  await page.goto(list);
+  await page.getByRole("link", { name: "A.cpp" }).waitFor();
+  await page.evaluate(() => { document.documentElement.dataset.instance = "original"; });
+  await page.getByRole("link", { name: "A.cpp" }).click();
+  await expect(page).toHaveURL(new RegExp(reader + "$"));
+  await expect(page.getByRole("heading", { name: "A.cpp" })).toBeVisible();
+  await page.getByRole("link", { name: "返回列表" }).click();
+  await expect(page.getByRole("link", { name: "A.cpp" })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "A.cpp" })).toBeVisible();
+  await page.goForward();
+  await expect(page.getByRole("link", { name: "A.cpp" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-instance", "original");
+});

@@ -1,7 +1,8 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, type MouseEvent, useCallback, useEffect, useState } from "react";
 import { TeamManagement } from "./TeamManagement";
 
 import { DeleteGroup } from "./DeleteGroup";
+import { usePrintNotifications } from "./use-print-notifications";
 import { PrintList, PrintPage } from "./ContestPrints";
 
 interface Member {
@@ -79,6 +80,28 @@ export function Workspace({
     status: "loading",
   });
   const workspace = workspaceState.status === "ready" ? workspaceState.data : emptyWorkspace;
+  const [path, setPath] = useState(window.location.pathname);
+  const printId = path.match(/\/print\/([a-f0-9-]{36})$/)?.[1];
+  const [version, setVersion] = useState(0);
+  const [noticeId, setNoticeId] = useState("");
+  usePrintNotifications(workspace.contest?.id ?? "", Boolean(printId), notice => {
+    if (notice.type === "reload") setVersion(value => value + 1);
+    if (notice.type === "toast" && notice.id) setNoticeId(notice.id);
+  });
+  useEffect(() => {
+    if (!noticeId) return;
+    const timeout = setTimeout(() => setNoticeId(""), 3500);
+    return () => clearTimeout(timeout);
+  }, [noticeId]);
+  function navigatePrint(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    const next = event.currentTarget.pathname;
+    window.history.pushState(null, "", next);
+    setPath(next);
+    setNoticeId("");
+    window.scrollTo(0, 0);
+  }
   const [teamName, setTeamName] = useState("");
   const [contestName, setContestName] = useState("");
   const [showTeamForm, setShowTeamForm] = useState(false);
@@ -98,6 +121,12 @@ export function Workspace({
       setWorkspaceState({ status: "denied" });
     }
   }, []);
+
+  useEffect(() => {
+    const back = () => { setPath(window.location.pathname); setNoticeId(""); void loadWorkspace(); };
+    window.addEventListener("popstate", back);
+    return () => window.removeEventListener("popstate", back);
+  }, [loadWorkspace]);
 
   useEffect(() => {
     const invitationToken = window.location.pathname.match(/^\/invite\/([a-f0-9]{32})$/)?.[1];
@@ -225,8 +254,7 @@ export function Workspace({
   }
 
   if (workspace.contest) {
-    const printId = window.location.pathname.match(/\/print\/([a-f0-9-]{36})$/)?.[1];
-    if (printId) return <PrintPage contestId={workspace.contest.id} printId={printId} />;
+    if (printId) return <PrintPage key={printId} contestId={workspace.contest.id} printId={printId} noticeId={noticeId} navigate={navigatePrint} />;
     return (
       <section className="workspace-card" aria-labelledby="contest-title">
         <header className="workspace-header">
@@ -241,7 +269,7 @@ export function Workspace({
           </button>
         </header>
         <a href="https://github.com/401-moe/VPrint/releases">安装 CLI</a>
-        <PrintList contestId={workspace.contest.id} />
+        <PrintList contestId={workspace.contest.id} version={version} navigate={navigatePrint} />
         {selectedTeam?.role === "owner" && <DeleteGroup kind="contest" id={workspace.contest.id} onDeleted={() => void returnToTeam()} />}
       </section>
     );
