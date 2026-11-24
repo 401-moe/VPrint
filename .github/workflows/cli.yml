@@ -9,6 +9,7 @@ on:
   push:
     tags: ['v*']
 permissions:
+  actions: read
   contents: read
 concurrency:
   group: native-cli-${{ github.event.pull_request.number || github.run_id }}
@@ -48,8 +49,22 @@ jobs:
           path: dist-cli/${{ matrix.asset }}
           if-no-files-found: error
       - run: pnpm run build
-      - uses: actions/download-artifact@v4
+      - id: download
+        continue-on-error: true
+        uses: actions/download-artifact@v4
         with:
+          artifact-ids: ${{ steps.uploaded.outputs.artifact-id }}
+          merge-multiple: true
+          path: downloaded
+      - name: Wait for the uploaded artifact to become visible
+        if: steps.download.outcome == 'failure'
+        shell: bash
+        run: sleep 20
+      - name: Retry downloading the same artifact through the GitHub API
+        if: steps.download.outcome == 'failure'
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
           artifact-ids: ${{ steps.uploaded.outputs.artifact-id }}
           merge-multiple: true
           path: downloaded
