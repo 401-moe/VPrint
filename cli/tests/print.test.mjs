@@ -62,10 +62,12 @@ test("select a team and contest, restart under that directory, and print exact b
   const config = join(root, "config"), practice = join(root, "practice"), subdir = join(practice, "solutions");
   await mkdir(config); await mkdir(subdir, { recursive: true });
   const received = [];
+  let dropReceipt = false;
   const server = createServer(async (req, res) => {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     received.push({ url: req.url, headers: req.headers, body: Buffer.concat(chunks) });
+    if (dropReceipt && req.url.endsWith("/prints")) { dropReceipt = false; return req.socket.destroy(); }
     res.setHeader("content-type", "application/json");
     if (req.url === "/api/cli/teams") res.end(JSON.stringify({ teams: [{ id: outerId, name: "早班" }, { id: innerId, name: "晚班" }] }));
     else if (req.url === "/api/cli/teams/" + innerId + "/contests") res.end(JSON.stringify({ contests: [{ id: innerId, name: "决赛", createdAt: 1000 }] }));
@@ -80,7 +82,7 @@ test("select a team and contest, restart under that directory, and print exact b
     version: 1, origin, accessToken: "fixture", refreshToken: "fixture-refresh", expiresAt: Date.now() + 60_000,
     publicKey: keys.publicKey.export({ format: "jwk" }), privateKey: keys.privateKey.export({ format: "jwk" }),
   }));
-  async function invoke(args, cwd, input = "") {
+  async function invoke(args, cwd, input = "", expected = 0) {
     const bin = process.env.VPRINT_TEST_BINARY;
     const child = spawn(bin || process.execPath, bin ? args : [entry, ...args], {
       cwd, env: { ...process.env, VPRINT_URL: origin, VPRINT_CONFIG_DIR: config },
@@ -90,7 +92,7 @@ test("select a team and contest, restart under that directory, and print exact b
     child.stderr.on("data", chunk => { output += chunk; });
     child.stdin.end(input);
     const status = await new Promise((resolve, reject) => { child.once("error", reject); child.once("close", resolve); });
-    assert.equal(status, 0, output);
+    assert.equal(status, expected, output);
     return output;
   }
   assert.match(await invoke(["use"], practice, "2\n1\n"), /已绑定 晚班 \/ 决赛/);
@@ -104,4 +106,12 @@ test("select a team and contest, restart under that directory, and print exact b
   assert.equal(decodeURIComponent(upload.headers["x-vprint-filename"]), "笔记");
   assert.ok(upload.headers["idempotency-key"]);
   assert.ok(received.every(r => r.headers.dpop && r.headers.authorization === "DPoP fixture"));
+  dropReceipt = true;
+  const batch = await invoke(["笔记", "missing.cpp", "笔记"], subdir, "", 1);
+  assert.match(batch, /成功 2，失败 1/);
+  const [lost, retried, manual] = received.slice(3);
+  assert.equal(lost.headers["idempotency-key"], retried.headers["idempotency-key"]);
+  assert.notEqual(lost.headers.dpop, retried.headers.dpop);
+  assert.notEqual(manual.headers["idempotency-key"], lost.headers["idempotency-key"]);
+
 });

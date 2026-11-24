@@ -240,6 +240,7 @@ export function Workspace({
             返回队伍
           </button>
         </header>
+        <a href="https://github.com/401-moe/VPrint/releases">安装 CLI</a>
         <PrintList contestId={workspace.contest.id} />
         {selectedTeam?.role === "owner" && <DeleteGroup kind="contest" id={workspace.contest.id} onDeleted={() => void returnToTeam()} />}
       </section>
