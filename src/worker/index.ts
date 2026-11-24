@@ -36,8 +36,8 @@ app.post("/api/auth/sign-out", async c => {
 
 app.route("/api", notificationRoutes);
 app.all("/api/auth/*", (context) => {
-  const auth = createAuth(context.env);
-  return auth.handler(context.req.raw);
+  const existingAccountOnly = context.req.header("x-vprint-existing-account") === "1";
+  return createAuth(context.env, { existingAccountOnly }).handler(context.req.raw);
 });
 
 app.get("/api/cli/device", getDeviceRequest);

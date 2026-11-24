@@ -94,6 +94,9 @@ export function App() {
     }
   }
 
+  const otpHeaders: Record<string, string> = { "content-type": "application/json" };
+  if (githubBinding) otpHeaders["x-vprint-existing-account"] = "1";
+
   async function requestOtp() {
     if (!emailInput.current?.reportValidity()) return;
     setPending(true);
@@ -102,7 +105,7 @@ export function App() {
     try {
       const response = await fetch("/api/auth/email-otp/send-verification-otp", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: otpHeaders,
         body: JSON.stringify({ email: form.email, type: "sign-in" }),
       });
       const body = (await response.json()) as { message?: string };
@@ -132,7 +135,7 @@ export function App() {
     try {
       const response = await fetch("/api/auth/sign-in/email-otp", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: otpHeaders,
         body: JSON.stringify({ email: form.email, otp }),
       });
       const body = (await response.json()) as { user?: Member; message?: string };

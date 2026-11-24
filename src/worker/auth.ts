@@ -32,7 +32,12 @@ export interface AuthUser {
   name: string;
 }
 
-export function createAuthOptions(env: AuthEnvironment, cliProtocol = false): BetterAuthOptions {
+interface AuthOptions {
+  cliProtocol?: boolean;
+  existingAccountOnly?: boolean;
+}
+
+function createAuthOptions(env: AuthEnvironment, { cliProtocol, existingAccountOnly }: AuthOptions): BetterAuthOptions {
   return {
     database: env.DB,
     secret: env.BETTER_AUTH_SECRET,
@@ -42,7 +47,7 @@ export function createAuthOptions(env: AuthEnvironment, cliProtocol = false): Be
       enabled: true,
     },
     plugins: [
-      createEmailOtpPlugin(env),
+      createEmailOtpPlugin(env, existingAccountOnly),
       githubSignIn(env),
       jwt(),
       oauthProvider({
@@ -76,8 +81,8 @@ export function createAuthOptions(env: AuthEnvironment, cliProtocol = false): Be
   };
 }
 
-export function createAuth(env: AuthEnvironment, cliProtocol = false) {
-  return betterAuth(createAuthOptions(env, cliProtocol));
+export function createAuth(env: AuthEnvironment, options: AuthOptions = {}) {
+  return betterAuth(createAuthOptions(env, options));
 }
 
 export async function getCurrentUser(env: AuthEnvironment, headers: Headers) {

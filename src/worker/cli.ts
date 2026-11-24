@@ -43,7 +43,7 @@ export async function cliToken(c: CliContext) {
     if (!active) return invalidGrant(c);
   }
 
-  const response = await createAuth(c.env, true).handler(request);
+  const response = await createAuth(c.env, { cliProtocol: true }).handler(request);
   if (!response.ok) return response;
   const tokens = await response.clone().json() as { access_token?: string; refresh_token?: string; token_type?: string };
   if (tokens.token_type?.toLowerCase() !== "dpop" || !tokens.access_token || (exchange && !tokens.refresh_token)) return invalidGrant(c);
