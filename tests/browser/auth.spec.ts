@@ -42,15 +42,15 @@ test("a member signs up, reloads, signs out, fails once, then signs in again", a
 
   await page.getByRole("button", { name: "退出登录" }).click();
   await expect(page.getByText("队员的队内电子打印工作台")).toBeVisible();
-  await expect(page.getByRole("button", { name: "登录" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "登录", exact: true })).toBeVisible();
 
   await page.getByLabel("邮箱").fill(email);
   await page.getByLabel("密码").fill("not the password");
-  await page.getByRole("button", { name: "登录" }).click();
+  await page.getByRole("button", { name: "登录", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Invalid email or password");
 
   await page.getByLabel("密码").fill("correct horse battery staple");
-  await page.getByRole("button", { name: "登录" }).click();
+  await page.getByRole("button", { name: "登录", exact: true }).click();
   await expect(page.getByText(email)).toBeVisible();
   await expect
     .poll(async () =>
@@ -77,7 +77,7 @@ test("a member signs in by email OTP and returns to the original location", asyn
   const email = `otp-${crypto.randomUUID()}@vprint.example`;
   const password = "correct horse battery staple";
   await page.goto("/invite/example?next=%2Fdevice%2F123");
-  await expect(page.getByRole("button", { name: "登录" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "已有账号？去登录", exact: true })).toBeVisible();
 
   await page.getByLabel("姓名").fill("浏览器验证码队员");
   await page.getByLabel("邮箱").fill(email);
@@ -89,7 +89,7 @@ test("a member signs in by email OTP and returns to the original location", asyn
     return (await response.json()) as { id: string };
   });
   await page.getByRole("button", { name: "退出登录" }).click();
-  await expect(page.getByRole("button", { name: "登录" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "登录", exact: true })).toBeVisible();
 
   await page.getByLabel("邮箱").fill(email);
   await page.getByRole("button", { name: "使用邮箱验证码" }).click();
