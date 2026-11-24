@@ -1,7 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "vprint-preview",
-  "routes": [{ "pattern": "vprint.401.moe", "custom_domain": true }],
+  "routes": [
+    { "pattern": "vprint.401.moe", "custom_domain": true },
+    { "pattern": "vprint-pr.401.moe", "custom_domain": true, "enabled": false, "previews_enabled": true }
+  ],
   "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": true },
@@ -35,5 +38,14 @@
     }
   ],
   "durable_objects": { "bindings": [{ "name": "NOTIFICATIONS", "class_name": "UserNotifications" }] },
-  "migrations": [{ "tag": "notifications-v1", "new_sqlite_classes": ["UserNotifications"] }]
+  "migrations": [{ "tag": "notifications-v1", "new_sqlite_classes": ["UserNotifications"] }],
+  "previews": {
+    "vars": { "VPRINT_PREVIEW_DOMAIN": "vprint-pr.401.moe" },
+    "d1_databases": [{
+      "binding": "DB",
+      "database_name": "vprint-pr-previews",
+      "database_id": "fc5334b4-f502-4944-98b9-8ad7e2f4a62e"
+    }],
+    "durable_objects": { "bindings": [{ "name": "NOTIFICATIONS", "class_name": "UserNotifications" }] }
+  }
 }

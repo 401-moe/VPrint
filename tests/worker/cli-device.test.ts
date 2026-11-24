@@ -20,6 +20,26 @@ beforeAll(async () => {
   await applyD1Migrations(env.DB, inject("d1Migrations"));
 });
 
+test("a Preview issues device links on its own HTTPS host", async () => {
+  const bindings = { ...env, VPRINT_PREVIEW_DOMAIN: "vprint-pr.401.moe" };
+  const origin = "https://test-branch.vprint-pr.401.moe";
+  const response = await worker.fetch(new Request(origin + "/api/auth/device/code", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: "vprint-cli",
+      scope: "offline_access vprint:teams:read vprint:print",
+      resource: origin + "/api",
+    }),
+  }), bindings);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ verification_uri: origin + "/device" });
+  expect(bindings.BETTER_AUTH_URL).toBe(loopbackOrigin);
+
+  const wrongHost = await worker.fetch(new Request("https://vprint.401.moe/api/me"), bindings);
+  expect(wrongHost.status).toBe(400);
+});
+
 test("a member can inspect and approve a pending CLI device request", async () => {
   const signUp = await worker.fetch(
     request("/api/auth/sign-up/email", {

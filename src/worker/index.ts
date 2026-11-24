@@ -11,11 +11,25 @@ import { captureDeviceRequest, decideDeviceRequest, getDeviceRequest } from "./c
 import { cliToken, getCliMe, logoutCli } from "./cli";
 
 export interface Environment extends AuthEnvironment {
+  VPRINT_PREVIEW_DOMAIN?: string;
   NOTIFICATIONS: DurableObjectNamespace;
   ASSETS: { fetch: (request: Request) => Promise<Response> };
 }
 
 const app = new Hono<{ Bindings: Environment }>();
+
+app.use("/api/*", async (c, next) => {
+  const domain = c.env.VPRINT_PREVIEW_DOMAIN;
+  if (domain) {
+    const url = new URL(c.req.url);
+    const [label, ...suffix] = url.hostname.split(".");
+    if (url.protocol !== "https:" || url.port || !label || suffix.join(".") !== domain) {
+      return c.text("Unknown preview origin", 400);
+    }
+    c.env = { ...c.env, BETTER_AUTH_URL: url.origin };
+  }
+  return next();
+});
 
 app.post("/api/auth/device/code", captureDeviceRequest);
 app.post("/api/auth/oauth2/token", cliToken);
