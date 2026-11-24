@@ -41,16 +41,43 @@ export async function useContest() {
   }
 }
 
-export async function printFile(path: string) {
-  const contestId = await findContest();
+async function submitFile(contestId: string, path: string) {
   const { bytes, filename } = await readPrintFile(path);
   const headers = new Headers({
     "content-type": "application/octet-stream",
     "idempotency-key": randomUUID(),
     "x-vprint-filename": encodeURIComponent(filename),
   });
-  const response = await apiRequest("/api/cli/contests/" + contestId + "/prints", "POST", headers, bytes);
-  if (!response.ok) throw new Error(filename + " 打印失败（HTTP " + response.status + "）。");
-  const result = await response.json() as { createdAt: number };
-  console.log(filename + " 已打印  " + new Date(result.createdAt).toLocaleString());
+  const endpoint = "/api/cli/contests/" + contestId + "/prints";
+  for (let attempt = 1; ; attempt++) {
+    let response: Response;
+    try {
+      response = await apiRequest(endpoint, "POST", headers, bytes);
+      if (response.ok) {
+        const receipt = await response.json() as { createdAt: number };
+        console.log(filename + " 已打印  " + new Date(receipt.createdAt).toLocaleString());
+        return;
+      }
+    } catch (error) {
+      if (attempt < 3 && (error instanceof TypeError || error instanceof SyntaxError ||
+          (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name)))) continue;
+      throw error;
+    }
+    if (attempt < 3 && (response.status === 408 || response.status >= 500)) continue;
+    throw new Error("HTTP " + response.status);
+  }
+}
+
+export async function printFiles(paths: string[]) {
+  const contestId = await findContest();
+  let failures = 0;
+  for (const path of paths) {
+    try { await submitFile(contestId, path); }
+    catch (error) {
+      failures++;
+      console.error(path + " 打印失败：" + (error instanceof Error ? error.message : "请求失败"));
+    }
+  }
+  console.log(`成功 ${paths.length - failures}，失败 ${failures}`);
+  if (failures) process.exitCode = 1;
 }
