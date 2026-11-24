@@ -122,3 +122,13 @@ body {
 .error:empty {
   display: none;
 }
+
+.device-card {
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+
+.device-card form, .device-card .error { margin-top: 1rem; }
+.device-card dl { display: grid; grid-template-columns: auto 1fr; gap: 0.6rem 1rem; }
+.device-card dt { color: #596877; }
+.device-card dd { margin: 0; }

@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { DevicePage } from "./DevicePage";
 import "./App.css";
 
 interface Member {
@@ -173,6 +174,8 @@ export function App() {
       </main>
     );
   }
+
+  if (location.pathname === "/device") return <DevicePage email={member.email} />;
 
   return (
     <main className="shell">
