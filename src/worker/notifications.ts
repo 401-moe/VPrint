@@ -77,17 +77,17 @@ export class UserNotifications extends DurableObject<Environment> {
   webSocketError(socket: WebSocket) { socket.close(1011, "Connection failed"); }
 }
 
-function notifications(env: Environment, userId: string) {
+function notifications(env: Pick<Environment, "NOTIFICATIONS">, userId: string) {
   return env.NOTIFICATIONS.get(env.NOTIFICATIONS.idFromName(userId));
 }
 
-export async function publishPrint(env: Environment, event: PrintEvent) {
+export async function publishPrint(env: Pick<Environment, "DB" | "NOTIFICATIONS">, event: PrintEvent) {
   const { results } = await env.DB.prepare("SELECT m.userId FROM team_member m JOIN contest c ON c.teamId = m.teamId WHERE c.id = ?")
     .bind(event.contestId).all<{ userId: string }>();
   await Promise.all(results.map(row => notifications(env, row.userId).fetch("https://internal/publish", { method: "POST", body: JSON.stringify(event) })));
 }
 
-export async function invalidateSubscriptions(env: Environment, userId: string) {
+export async function invalidateSubscriptions(env: Pick<Environment, "NOTIFICATIONS">, userId: string) {
   await notifications(env, userId).fetch("https://internal/revalidate", { method: "POST" });
 }
 

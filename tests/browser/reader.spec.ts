@@ -32,7 +32,7 @@ for (const width of [390, 1280]) {
     expect(selected).toBe(lines[36].trimStart() + "\n" + lines[37]);
     const found = await page.evaluate(() => {
       window.getSelection()?.removeAllRanges();
-      return (window as Window & { find(query: string): boolean }).find('return "ok"; // done');
+      return (window as unknown as Window & { find(query: string): boolean }).find('return "ok"; // done');
     });
     expect(found).toBe(true);
     await expect(page.getByRole("link", { name: "返回列表" })).toHaveAttribute("href", "/contest/" + contestId);
