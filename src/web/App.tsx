@@ -7,7 +7,7 @@ interface Member {
   name: string;
 }
 
-type Mode = "signin" | "signup";
+type Mode = "signin" | "signup" | "otp";
 
 const initialForm = { email: "", password: "", name: "" };
 
@@ -16,11 +16,16 @@ export function App() {
   const [memberChecked, setMemberChecked] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [mode, setMode] = useState<Mode>("signup");
+  const [otp, setOtp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [returnTo, setReturnTo] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
+
+    const location = window.location.pathname + window.location.search;
+    if (location !== "/") setReturnTo(location);
 
     fetch("/api/me")
       .then((response) => (response.ok ? response.json() : null))
@@ -39,17 +44,25 @@ export function App() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (mode === "otp") {
+      await signInWithOtp();
+      return;
+    }
+
     setPending(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/auth/sign-${mode === "signup" ? "up" : "in"}/email`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          mode === "signup" ? form : { email: form.email, password: form.password },
-        ),
-      });
+      const response = await fetch(
+        mode === "signup" ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(
+            mode === "signup" ? form : { email: form.email, password: form.password },
+          ),
+        },
+      );
       const body = (await response.json()) as { user?: Member; message?: string };
 
       if (!response.ok || !body.user) {
@@ -60,6 +73,7 @@ export function App() {
         return;
       }
 
+      restoreLocation();
       setForm(initialForm);
       setMember(body.user);
     } catch {
@@ -67,6 +81,73 @@ export function App() {
     } finally {
       setPending(false);
     }
+  }
+
+  async function requestOtp() {
+    setPending(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/auth/email-otp/send-verification-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: form.email, type: "sign-in" }),
+      });
+      const body = (await response.json()) as { message?: string };
+
+      if (!response.ok) {
+        setError(body.message ?? "验证码发送失败，请稍后重试。");
+        return;
+      }
+    } catch {
+      setError("网络异常，请稍后重试。");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function switchMode(nextMode: Mode) {
+    setMode(nextMode);
+    setError(null);
+    if (mode === "signin" && nextMode === "otp") void requestOtp();
+  }
+
+  async function signInWithOtp() {
+    setPending(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/auth/sign-in/email-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: form.email, otp }),
+      });
+      const body = (await response.json()) as { user?: Member; message?: string };
+
+      if (!response.ok || !body.user) {
+        setError(body.message ?? "登录失败，请检查验证码。");
+        return;
+      }
+
+      restoreLocation();
+      setForm(initialForm);
+      setOtp("");
+      setMember(body.user);
+    } catch {
+      setError("网络异常，请稍后重试。");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function restoreLocation() {
+    if (!returnTo) return;
+
+    const target = new URL(returnTo, window.location.origin);
+    if (target.origin !== window.location.origin) return;
+
+    window.history.replaceState(null, "", `${target.pathname}${target.search}`);
+    setReturnTo(null);
   }
 
   async function signOut() {
@@ -86,6 +167,7 @@ export function App() {
 
       setMember(null);
       setMode("signin");
+      setReturnTo(`${window.location.pathname}${window.location.search}`);
       setError(null);
     } catch {
       setError("网络异常，请稍后重试。");
@@ -137,37 +219,63 @@ export function App() {
                 required
               />
             </label>
-            <label className="field">
-              密码
-              <input
-                name="password"
-                type="password"
-                autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                minLength={8}
-                value={form.password}
-                onChange={(event) => setForm({ ...form, password: event.target.value })}
-                required
-              />
-            </label>
+            {mode !== "otp" && (
+              <label className="field">
+                密码
+                <input
+                  name="password"
+                  type="password"
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                  minLength={8}
+                  value={form.password}
+                  onChange={(event) => setForm({ ...form, password: event.target.value })}
+                  required
+                />
+              </label>
+            )}
+            {mode === "otp" && (
+              <label className="field">
+                验证码
+                <input
+                  name="otp"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="\d{6}"
+                  maxLength={6}
+                  value={otp}
+                  onChange={(event) => setOtp(event.target.value)}
+                  required
+                />
+              </label>
+            )}
             {error && (
               <p className="error" role="alert">
                 {error}
               </p>
             )}
             <button className="button" type="submit" disabled={pending}>
-              {pending ? "处理中…" : mode === "signup" ? "创建账号" : "登录"}
+              {pending
+                ? "处理中…"
+                : mode === "signup"
+                  ? "创建账号"
+                  : mode === "otp"
+                    ? "验证并登录"
+                    : "登录"}
             </button>
           </form>
           <button
             className="button secondary"
             type="button"
             disabled={pending}
-            onClick={() => {
-              setMode(mode === "signup" ? "signin" : "signup");
-              setError(null);
-            }}
+            onClick={() =>
+              switchMode(mode === "signup" ? "signin" : mode === "signin" ? "otp" : "signin")
+            }
           >
-            {mode === "signup" ? "已有账号？去登录" : "第一次使用？创建账号"}
+            {mode === "signup"
+              ? "已有账号？去登录"
+              : mode === "signin"
+                ? "使用邮箱验证码"
+                : "返回密码登录"}
           </button>
         </section>
       </main>
