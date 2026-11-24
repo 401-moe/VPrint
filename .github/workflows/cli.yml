@@ -1,0 +1,62 @@
+name: Native CLI
+on:
+  pull_request:
+    paths:
+      - 'cli/**'
+      - 'src/shared/**'
+      - '.github/workflows/cli.yml'
+      - 'pnpm-lock.yaml'
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: native-cli-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset: vprint-linux-x64
+          - os: macos-latest
+            asset: vprint-macos-arm64
+          - os: windows-latest
+            asset: vprint-windows-x64.exe
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.19.0
+          cache: true
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.5'
+      - run: pnpm install --frozen-lockfile
+      - run: bun build --compile cli/src/index.ts --outfile dist-cli/${{ matrix.asset }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: dist-cli/${{ matrix.asset }}
+          if-no-files-found: error
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: downloaded
+      - if: runner.os != 'Windows'
+        run: chmod +x downloaded/${{ matrix.asset }}
+      - run: node --test cli/tests/login.test.mjs cli/tests/print.test.mjs
+        env:
+          VPRINT_TEST_BINARY: ${{ github.workspace }}/downloaded/${{ matrix.asset }}
+      - name: Verify against VPrint preview
+        if: github.repository == '401-moe/VPrint' && (github.event_name == 'push' || (github.head_ref == 'integration/vprint-mvp' && github.event.pull_request.head.repo.full_name == github.repository))
+        run: node cli/tests/preview.mjs
+        env:
+          VPRINT_TEST_BINARY: ${{ github.workspace }}/downloaded/${{ matrix.asset }}
