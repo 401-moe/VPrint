@@ -256,6 +256,7 @@ export function Workspace({
           </h1>
           <p className="member-name">{member.email}</p>
         </div>
+        <a href="/account">账号设置</a>
         <button className="button secondary" onClick={signOut} disabled={pending}>
           退出登录
         </button>
