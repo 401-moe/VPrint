@@ -21,16 +21,34 @@ create table "vprint_cli_grant" (
   "deviceCodeId" text not null unique,
   "userId" text not null references "user" ("id") on delete cascade,
   "clientId" text not null,
-  "keyThumbprint" text not null,
+  "keyThumbprint" text,
   "hostname" text not null,
   "os" text not null check ("os" in ('linux', 'darwin', 'win32')),
   "scope" text not null,
   "approvedAt" integer not null,
   "expiresAt" integer not null,
   "revokedAt" integer,
+  "refreshTokenHash" text,
   "createdAt" integer not null,
   "updatedAt" integer not null
 );
+
+create table "vprint_cli_device_request" (
+  "deviceCode" text primary key references deviceCode(deviceCode) on delete cascade,
+  "userCode" text not null unique,
+  "hostname" text not null,
+  "os" text not null check ("os" in ('linux', 'darwin', 'win32')),
+  "createdAt" integer not null
+);
+
+create trigger vprint_cli_grant_revoke_on_email_verified
+after update of "emailVerified" on "user"
+when old."emailVerified" = 0 and new."emailVerified" = 1
+begin
+  update "vprint_cli_grant"
+  set "revokedAt" = unixepoch(), "updatedAt" = unixepoch()
+  where "userId" = new."id" and "revokedAt" is null;
+end;
 
 insert into "oauthClient" (
   "id", "clientId", "disabled", "scopes", "redirectUris",
@@ -39,22 +57,12 @@ insert into "oauthClient" (
 ) values (
   'vprint-cli', 'vprint-cli', 0,
   '["offline_access","vprint:teams:read","vprint:print"]',
-  '[]', '["urn:ietf:params:oauth:grant-type:device_code"]',
+  '[]', '["urn:ietf:params:oauth:grant-type:device_code","refresh_token"]',
   'none', 1, unixepoch(), unixepoch(), 'VPrint CLI'
 );
 
-insert into "oauthResource" (
-  "id", "identifier", "name", "allowedScopes",
-  "dpopBoundAccessTokensRequired", "disabled", "accessTokenTtl",
-  "createdAt", "updatedAt", "policyVersion"
-) values (
-  'vprint-api', 'https://vprint.401.moe/api', 'VPrint API',
-  '["vprint:teams:read","vprint:print"]', 1, 0, 3600,
-  unixepoch(), unixepoch(), 1
-);
-
-insert into "oauthClientResource" ("id", "clientId", "resourceId", "createdAt")
-values ('vprint-cli-api', 'vprint-cli', 'https://vprint.401.moe/api', unixepoch());
+create unique index vprint_cli_refresh_hash on vprint_cli_grant(refreshTokenHash) where refreshTokenHash is not null;
+create unique index vprint_cli_bound_key on vprint_cli_grant(userId, clientId, keyThumbprint) where keyThumbprint is not null;
 
 create index "oauthClient_userId_idx" on "oauthClient" ("userId");
 

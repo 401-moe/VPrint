@@ -129,7 +129,7 @@ test("the CLI can start device authorization with its host metadata", async () =
       body: new URLSearchParams({
         client_id: "vprint-cli",
         scope: "offline_access vprint:teams:read vprint:print",
-        resource: "https://vprint.401.moe/api",
+        resource: loopbackOrigin + "/api",
       }).toString(),
     }),
     env,

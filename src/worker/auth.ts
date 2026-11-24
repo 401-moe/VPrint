@@ -1,4 +1,4 @@
-import { betterAuth } from "better-auth";
+import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { jwt } from "better-auth/plugins";
 import {
   oauthDeviceAuthorization,
@@ -12,13 +12,12 @@ export interface AuthEnvironment {
   BETTER_AUTH_URL: string;
 }
 
-import type { BetterAuthOptions } from "better-auth";
-
-export function createAuthOptions(env: AuthEnvironment): BetterAuthOptions {
+export function createAuthOptions(env: AuthEnvironment, cliProtocol = false): BetterAuthOptions {
   return {
     database: env.DB,
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
+    disabledPaths: ["/device/approve", "/device/deny", ...(cliProtocol ? [] : ["/oauth2/token", "/device/code"])],
     emailAndPassword: {
       enabled: true,
     },
@@ -32,10 +31,11 @@ export function createAuthOptions(env: AuthEnvironment): BetterAuthOptions {
         ],
         loginPage: `${env.BETTER_AUTH_URL}/`,
         consentPage: `${env.BETTER_AUTH_URL}/device`,
-        grantTypes: ["urn:ietf:params:oauth:grant-type:device_code"],
+        grantTypes: ["authorization_code", "refresh_token"],
+        enforcePerClientResources: false,
         resources: [
           {
-            identifier: "https://vprint.401.moe/api",
+            identifier: `${env.BETTER_AUTH_URL}/api`,
             allowedScopes: [
               "vprint:teams:read",
               "vprint:print",
@@ -54,6 +54,6 @@ export function createAuthOptions(env: AuthEnvironment): BetterAuthOptions {
   };
 }
 
-export function createAuth(env: AuthEnvironment) {
-  return betterAuth(createAuthOptions(env));
+export function createAuth(env: AuthEnvironment, cliProtocol = false) {
+  return betterAuth(createAuthOptions(env, cliProtocol));
 }
