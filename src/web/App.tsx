@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { DevicePage } from "./DevicePage";
 import "./App.css";
+import { GithubChoice, openGithub } from "./GithubChoice";
 import { Workspace } from "./Workspace";
 
 interface Member {
@@ -11,13 +12,17 @@ interface Member {
 
 type Mode = "signin" | "signup" | "otp";
 
+const githubPath = "/github/choice";
+const githubBinding = location.pathname === githubPath && new URLSearchParams(location.search).has("bind");
+const otpFallback = location.pathname === "/login" && new URLSearchParams(location.search).get("method") === "otp";
+
 const initialForm = { email: "", password: "", name: "" };
 
 export function App() {
   const [member, setMember] = useState<Member | null>(null);
   const [memberChecked, setMemberChecked] = useState(false);
   const [form, setForm] = useState(initialForm);
-  const [mode, setMode] = useState<Mode>("signup");
+  const [mode, setMode] = useState<Mode>(githubBinding ? "signin" : otpFallback ? "otp" : "signup");
   const [otp, setOtp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -28,7 +33,8 @@ export function App() {
   useEffect(() => {
     let active = true;
 
-    const location = window.location.pathname + window.location.search;
+    const next = new URLSearchParams(window.location.search).get("next");
+    const location = otpFallback && next?.startsWith("/") && !next.startsWith("//") ? next : window.location.pathname + window.location.search;
     if (location !== "/") setReturnTo(location);
 
     fetch("/api/me")
@@ -193,6 +199,8 @@ export function App() {
     );
   }
 
+  if (location.pathname === githubPath && (!githubBinding || member)) return <GithubChoice member={member} />;
+
   if (!member) {
     return (
       <main className="shell">
@@ -281,7 +289,7 @@ export function App() {
                     : "登录"}
             </button>
           </form>
-          {mode !== "signup" && <button className="button secondary" type="button" disabled={pending} onClick={() => switchMode("signup")}>第一次使用？创建账号</button>}
+          {!githubBinding && mode !== "signup" && <button className="button secondary" type="button" disabled={pending} onClick={() => switchMode("signup")}>第一次使用？创建账号</button>}
           <button
             className="button secondary"
             type="button"
@@ -296,6 +304,11 @@ export function App() {
                 ? "使用邮箱验证码"
                 : "返回密码登录"}
           </button>
+          {!githubBinding && <button className="button secondary" type="button" disabled={pending} onClick={async () => {
+            setPending(true);
+            try { await openGithub(returnTo ?? "/"); }
+            catch (cause) { setError(cause instanceof Error ? cause.message : "GitHub 登录失败。"); setPending(false); }
+          }}>使用 GitHub 登录</button>}
         </section>
       </main>
     );
