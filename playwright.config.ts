@@ -8,6 +8,7 @@ const state = "--persist-to .wrangler/browser-test";
 export default defineConfig({
   testDir: "./tests/browser",
   timeout: 30_000,
+  workers: 1,
   use: {
     baseURL,
     browserName: "chromium",

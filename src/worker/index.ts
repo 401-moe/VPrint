@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { createAuth, type AuthEnvironment } from "./auth";
+import { createAuth, getCurrentUser, type AuthEnvironment } from "./auth";
+import { teamsRoutes } from "./teams";
 
 export interface Environment extends AuthEnvironment {
   ASSETS: { fetch: (request: Request) => Promise<Response> };
@@ -12,19 +13,15 @@ app.all("/api/auth/*", (context) => {
   return auth.handler(context.req.raw);
 });
 
-app.get("/api/me", async (context) => {
-  const auth = createAuth(context.env);
-  const session = await auth.api.getSession({ headers: context.req.raw.headers });
+app.route("/api", teamsRoutes);
 
-  if (!session) {
+app.get("/api/me", async (context) => {
+  const user = await getCurrentUser(context.env, context.req.raw.headers);
+  if (!user) {
     return context.json({ error: "authentication required" }, 401);
   }
 
-  return context.json({
-    id: session.user.id,
-    email: session.user.email,
-    name: session.user.name,
-  });
+  return context.json(user);
 });
 
 app.get("*", (context) => context.env.ASSETS.fetch(context.req.raw));
