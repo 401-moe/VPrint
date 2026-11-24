@@ -27,7 +27,7 @@ jobs:
           version: 11.19.0
           cache: true
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
+      - run: pnpm exec wrangler deploy --dry-run
       - run: pnpm --filter @vprint/cli check
       - run: pnpm --filter @vprint/cli test
       - run: pnpm run test:api --run

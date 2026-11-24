@@ -24,6 +24,7 @@ export function PrintList({ contestId, version, navigate }: { contestId: string;
         if (!response.ok) throw new Error();
         const data = await response.json() as { printouts: PrintRecord[] };
         setRecords(data.printouts);
+        setError(false);
       })
       .catch(() => { if (!controller.signal.aborted) setError(true); });
     return () => controller.abort();
@@ -52,6 +53,7 @@ export function PrintPage({ contestId, printId, noticeId, navigate }: { contestI
       .then(async response => {
         if (!response.ok) throw new Error();
         setDetail(await response.json() as PrintDetail);
+        setError(false);
       })
       .catch(() => { if (!controller.signal.aborted) setError(true); });
     return () => controller.abort();

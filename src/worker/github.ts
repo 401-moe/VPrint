@@ -17,8 +17,9 @@ interface Pending {
 }
 
 function localPath(value: string, origin: string) {
-  const url = new URL(value, origin);
-  return url.origin === origin ? url.pathname + url.search : "/";
+  const url = URL.parse(value, origin);
+  if (!url || url.origin !== origin || url.pathname.startsWith("//")) return "/";
+  return url.pathname + url.search;
 }
 
 async function startSession(ctx: AuthContext, userId: string) {
@@ -137,7 +138,7 @@ export function githubSignIn(env: AuthEnvironment): BetterAuthPlugin {
         await db.prepare("DELETE FROM github_choice WHERE id = ?").bind(choice.id).run();
         const cookie = pendingCookie(ctx);
         ctx.setCookie(cookie.name, "", { ...cookie.attributes, maxAge: 0 });
-        return ctx.json({ returnPath: choice.returnPath });
+        return ctx.json({ returnPath: localPath(choice.returnPath, origin) });
       }),
     },
   };

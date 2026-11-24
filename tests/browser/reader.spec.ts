@@ -62,3 +62,26 @@ test("opening a print and returning keeps the contest document and its subscript
   await expect(page.getByRole("link", { name: "A.cpp" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-instance", "original");
 });
+
+test("a contest recovers from an initial network failure without reloading the page", async ({ page }) => {
+  let sessionRequests = 0;
+  let listRequests = 0;
+  await page.route("**/api/me", route => route.fulfill({ json: { id: "member", name: "甲", email: "reader@example.test" } }));
+  await page.route("**/api/workspace?**", route => route.fulfill({ json: { teams: [], contests: [], selectedTeamId: null, contest: { id: contestId, name: "训练" } } }));
+  await page.route("**/api/notification-session", route => {
+    sessionRequests++;
+    return sessionRequests === 1 ? route.fulfill({ status: 503 }) : route.fulfill({ json: { id: "reader-session" } });
+  });
+  await page.route("**/api/contests/*/prints", route => {
+    listRequests++;
+    return listRequests === 1 ? route.fulfill({ status: 503 }) : route.fulfill({ json: { printouts: [{ id: printId, filename: "A.cpp", createdAt: 1000 }] } });
+  });
+  // Use the tab-hosted transport so Playwright can intercept its WebSocket.
+  await page.addInitScript(() => { Object.defineProperty(window, "SharedWorker", { value: undefined }); });
+  await page.routeWebSocket("**/api/notifications", socket => {
+    socket.onMessage(() => socket.send(JSON.stringify({ subscribed: [contestId] })));
+  });
+  await page.goto("/contest/" + contestId);
+  await expect(page.getByRole("link", { name: "A.cpp" })).toBeVisible();
+  expect(sessionRequests).toBe(2);
+});

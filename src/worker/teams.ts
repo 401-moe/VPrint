@@ -146,21 +146,13 @@ teamsRoutes.post("/teams/:teamId/contests", async (context) => {
   const name = contestName((body as { name?: unknown } | null)?.name);
   if (!name) return context.json({ error: "invalid contest name" }, 400);
 
-  const membership = await context.env.DB.prepare(
-    "SELECT role FROM team_member WHERE teamId = ? AND userId = ?",
-  )
-    .bind(teamIdValue, user.id)
-    .first<{ role: string }>();
-  if (!membership) return context.json({ error: "team not found" }, 403);
-
   const id = crypto.randomUUID();
   const createdAt = Date.now();
-  const result = await context.env.DB.prepare(
-    "INSERT INTO contest (id, teamId, name, createdAt) VALUES (?, ?, ?, ?)",
-  )
-    .bind(id, teamIdValue, name, createdAt)
-    .run();
-  if (!result.success) return context.json({ error: "failed to create contest" }, 500);
+  const result = await context.env.DB.prepare(`
+    INSERT INTO contest (id, teamId, name, createdAt)
+    SELECT ?, teamId, ?, ? FROM team_member WHERE teamId = ? AND userId = ?
+  `).bind(id, name, createdAt, teamIdValue, user.id).run();
+  if (result.meta.changes !== 1) return context.json({ error: "team not found" }, 403);
 
   return context.json({ id, name, createdAt }, 201);
 });
@@ -289,13 +281,13 @@ teamsRoutes.get("/workspace", async (context) => {
 
   const contests = await context.env.DB.prepare(
     `
-      SELECT id, name, createdAt
-      FROM contest
-      WHERE teamId = ?
-      ORDER BY createdAt DESC, id DESC
+      SELECT c.id, c.name, c.createdAt
+      FROM contest c JOIN team_member m ON m.teamId = c.teamId
+      WHERE c.teamId = ? AND m.userId = ?
+      ORDER BY c.createdAt DESC, c.id DESC
     `,
   )
-    .bind(selectedTeam.id)
+    .bind(selectedTeam.id, user.id)
     .all<ContestRow>();
 
   return context.json({

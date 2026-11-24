@@ -52,23 +52,37 @@ export function usePrintNotifications(contest: string, reader: boolean, receive:
     let active = true, channel: Channel | undefined;
     let focusedAt = document.hasFocus() ? Date.now() : 0;
     let epoch = 0;
+    let retryTimer: number | undefined;
+    let retryDelay = 500;
     const update = () => channel?.update({ contest, reader: readMode.current, visible: document.visibilityState === "visible", focusedAt });
     refresh.current = update;
     const focus = () => { focusedAt = Date.now(); update(); };
-    function stop() { epoch++; channel?.close(); channel = undefined; }
+    function stop() {
+      epoch++;
+      window.clearTimeout(retryTimer);
+      channel?.close();
+      channel = undefined;
+    }
     async function start() {
       const generation = ++epoch;
       try {
         const result = await fetch("/api/notification-session");
-        if (!result.ok) return;
+        if (result.status === 401 || result.status === 403) return;
+        if (!result.ok) throw new Error("Notification session unavailable");
         const { id } = await result.json() as { id: string };
         if (!active || epoch !== generation || channel) return;
         channel = connect(id, notice => {
           if (notice.type === "ended") window.location.reload();
           else handler.current(notice);
         });
+        retryDelay = 500;
         update();
-      } catch { /* Reopening the page retries the subscription. */ }
+      } catch {
+        if (active && epoch === generation && !channel) {
+          retryTimer = window.setTimeout(start, retryDelay);
+          retryDelay = Math.min(retryDelay * 2, 10000);
+        }
+      }
     }
     void start();
     window.addEventListener("focus", focus);
