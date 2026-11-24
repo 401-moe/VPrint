@@ -28,6 +28,8 @@ jobs:
           cache: true
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
+      - run: pnpm --filter @vprint/cli check
+      - run: pnpm --filter @vprint/cli test
       - run: pnpm run test:api --run
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run test:browser
