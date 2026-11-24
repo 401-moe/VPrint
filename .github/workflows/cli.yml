@@ -1,0 +1,115 @@
+name: Native CLI
+on:
+  pull_request:
+    paths:
+      - 'cli/**'
+      - 'src/shared/**'
+      - '.github/workflows/cli.yml'
+      - 'pnpm-lock.yaml'
+  push:
+    tags: ['v*']
+permissions:
+  actions: read
+  contents: read
+concurrency:
+  group: native-cli-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset: vprint-linux-x64
+          - os: macos-latest
+            asset: vprint-macos-arm64
+          - os: windows-latest
+            asset: vprint-windows-x64.exe
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.19.0
+          cache: true
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.5'
+      - run: pnpm install --frozen-lockfile
+      - run: bun build --compile cli/src/index.ts --outfile dist-cli/${{ matrix.asset }}
+      - id: uploaded
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: dist-cli/${{ matrix.asset }}
+          if-no-files-found: error
+      - run: pnpm run build
+      - id: download
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ steps.uploaded.outputs.artifact-id }}
+          merge-multiple: true
+          path: downloaded
+      - name: Wait for the uploaded artifact to become visible
+        if: steps.download.outcome == 'failure'
+        shell: bash
+        run: sleep 20
+      - name: Retry downloading the same artifact through the GitHub API
+        if: steps.download.outcome == 'failure'
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          artifact-ids: ${{ steps.uploaded.outputs.artifact-id }}
+          merge-multiple: true
+          path: downloaded
+      - if: runner.os != 'Windows'
+        run: chmod +x downloaded/${{ matrix.asset }}
+      - run: node --test cli/tests/login.test.mjs cli/tests/print.test.mjs
+        env:
+          VPRINT_TEST_BINARY: ${{ github.workspace }}/downloaded/${{ matrix.asset }}
+      - name: Verify native binary against local Worker and D1
+        run: node cli/tests/native-worker.mjs
+        env:
+          VPRINT_TEST_BINARY: ${{ github.workspace }}/downloaded/${{ matrix.asset }}
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: native
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: vprint-*
+          path: assets
+          merge-multiple: true
+      - name: Publish tested standalone binaries
+        working-directory: assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          binaries=(vprint-linux-x64 vprint-macos-arm64 vprint-windows-x64.exe)
+          sha256sum "${binaries[@]}" > SHA256SUMS
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          从下方下载对应系统的独立程序，保存到自己的目录即可运行。
+
+          - Linux x64 和 Apple Silicon Mac：将文件重命名为 `vprint`，执行 `chmod +x vprint`，再运行 `./vprint login`。
+          - Windows x64：将文件重命名为 `vprint.exe`，在 PowerShell 中运行 `.\vprint.exe login`。
+
+          按终端提示在网页上批准登录。在比赛目录运行 `vprint use` 选择比赛，之后每次用 `vprint A.cpp` 打印。尚未加入 PATH 时，继续使用上面的相对路径运行命令。
+
+          [打开 VPrint](https://vprint.401.moe)
+          NOTES
+          flags=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then flags+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" --verify-tag "${flags[@]}" \
+            --title "VPrint CLI $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md" \
+            "${binaries[@]}" SHA256SUMS

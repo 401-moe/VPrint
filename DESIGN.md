@@ -113,6 +113,8 @@ CLI 逐个显示文件名和打印结果。某个文件失败后继续处理其�
 
 部署平台优先使用 Cloudflare Workers。首版建议用 Worker、静态资源和 D1 提供应用，并用支持休眠的 Durable Object 承载浏览器共享的 WebSocket。
 
+对外域名为 `https://vprint.401.moe`。Web、API、CLI 默认服务地址、设备验证网址和邀请链接使用同一来源。GitHub OAuth App 的 Homepage URL 使用站点根地址，Authorization callback URL 使用 `https://vprint.401.moe/api/auth/callback/github`。
+
 | 部分 | 建议 | 对应的产品行为 |
 | --- | --- | --- |
 | Web | React、TypeScript、Vite、Highlight.js、Workers Static Assets | 静态资源直接分发。比赛和阅读页的深链接加载同一应用，API、认证回调和协议发现端点由 Worker 处理。[静态资源路由](https://developers.cloudflare.com/workers/static-assets/routing/single-page-application/) |
