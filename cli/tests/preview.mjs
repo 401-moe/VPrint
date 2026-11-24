@@ -5,7 +5,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-const origin = "https://vprint.401.moe";
+const origin = process.env.VPRINT_ACCEPTANCE_ORIGIN || "https://vprint.401.moe";
 const binary = resolve(process.env.VPRINT_TEST_BINARY);
 const root = await mkdtemp(join(tmpdir(), "vprint-release-"));
 const account = randomUUID();

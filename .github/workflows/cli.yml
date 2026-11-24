@@ -41,22 +41,24 @@ jobs:
           bun-version: '1.4.5'
       - run: pnpm install --frozen-lockfile
       - run: bun build --compile cli/src/index.ts --outfile dist-cli/${{ matrix.asset }}
-      - uses: actions/upload-artifact@v4
+      - id: uploaded
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
           path: dist-cli/${{ matrix.asset }}
           if-no-files-found: error
+      - run: pnpm run build
       - uses: actions/download-artifact@v4
         with:
-          name: ${{ matrix.asset }}
+          artifact-ids: ${{ steps.uploaded.outputs.artifact-id }}
+          merge-multiple: true
           path: downloaded
       - if: runner.os != 'Windows'
         run: chmod +x downloaded/${{ matrix.asset }}
       - run: node --test cli/tests/login.test.mjs cli/tests/print.test.mjs
         env:
           VPRINT_TEST_BINARY: ${{ github.workspace }}/downloaded/${{ matrix.asset }}
-      - name: Verify against VPrint preview
-        if: github.repository == '401-moe/VPrint' && (github.event_name == 'push' || (github.head_ref == 'integration/vprint-mvp' && github.event.pull_request.head.repo.full_name == github.repository))
-        run: node cli/tests/preview.mjs
+      - name: Verify native binary against local Worker and D1
+        run: node cli/tests/native-worker.mjs
         env:
           VPRINT_TEST_BINARY: ${{ github.workspace }}/downloaded/${{ matrix.asset }}
