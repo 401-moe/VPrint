@@ -12,7 +12,8 @@ const entry = fileURLToPath(new URL("../src/index.ts", import.meta.url));
 
 function run(args, env) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [entry, ...args], {
+    const binary = process.env.VPRINT_TEST_BINARY;
+    const child = spawn(binary || process.execPath, binary ? args : [entry, ...args], {
       env: { ...process.env, ...env },
       stdio: ["ignore", "pipe", "pipe"],
     });
