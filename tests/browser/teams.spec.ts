@@ -1,20 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { start, stop } from "./server.mjs";
-
-test.beforeAll(async () => {
-  await start();
-});
-
-test.afterAll(async () => {
-  await stop();
-});
 
 test("a signed-in owner creates a team and a contest, then a teammate joins by invitation", async ({
   page,
 }) => {
   await page.goto("/");
   await page.getByLabel("姓名").fill("浏览器建队者");
-  const suffix = Date.now();
+  const suffix = crypto.randomUUID();
   await page.getByLabel("邮箱").fill(`team-owner-${suffix}@vprint.example`);
   await page.getByLabel("密码").fill("correct horse battery staple");
   await page.getByRole("button", { name: "创建账号" }).click();
