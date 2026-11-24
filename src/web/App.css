@@ -59,7 +59,7 @@ body {
 }
 
 .workspace-toolbar {
-  grid-template-columns: minmax(12rem, 1fr) auto;
+  grid-template-columns: minmax(12rem, 1fr) auto auto;
 }
 
 .invitation {
