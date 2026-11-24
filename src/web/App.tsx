@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
+import { DevicePage } from "./DevicePage";
 import "./App.css";
+import { Workspace } from "./Workspace";
 
 interface Member {
   id: string;
@@ -282,25 +284,11 @@ export function App() {
     );
   }
 
+  if (location.pathname === "/device") return <DevicePage email={member.email} />;
+
   return (
     <main className="shell">
-      <section className="card" aria-labelledby="member-title">
-        <h1 className="title" id="member-title">
-          已登录
-        </h1>
-        <div className="member">
-          <p className="member-email">{member.email}</p>
-          <p className="member-name">{member.name}</p>
-          {error && (
-            <p className="error" role="alert">
-              {error}
-            </p>
-          )}
-          <button className="button" onClick={signOut} disabled={pending}>
-            {pending ? "处理中…" : "退出登录"}
-          </button>
-        </div>
-      </section>
+      <Workspace member={member} error={error} pending={pending} signOut={signOut} />
     </main>
   );
 }

@@ -1,10 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { start, stop } from "./server.mjs";
-
-test.beforeAll(async () => {
-  await start();
-});
-
 async function sentOtp() {
   const port = process.env.VPRINT_E2E_PORT ?? "8801";
   const response = await fetch(
@@ -28,27 +22,23 @@ async function sentOtp() {
   return (detailBody.result as { text?: string }).text?.match(/\b\d{6}\b/)?.[0];
 }
 
-test.afterAll(async () => {
-  await stop();
-});
-
 test("a member signs up, reloads, signs out, fails once, then signs in again", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "VPrint" })).toBeVisible();
 
   await page.getByLabel("姓名").fill("浏览器队员");
-  const email = `member-${Date.now()}@vprint.example`;
+  const email = `member-${crypto.randomUUID()}@vprint.example`;
   await page.getByLabel("邮箱").fill(email);
   await page.getByLabel("密码").fill("correct horse battery staple");
   await page.getByRole("button", { name: "创建账号" }).click();
-  await expect(page.getByRole("heading", { name: "已登录" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "工作台" })).toBeVisible();
   const memberId = await page.evaluate(async () => {
     const response = await fetch("/api/me");
     return (await response.json()) as { id: string };
   });
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: "已登录" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "工作台" })).toBeVisible();
   await expect(page.getByText(email)).toBeVisible();
   await expect
     .poll(async () =>
@@ -84,7 +74,7 @@ test("a member signs up, reloads, signs out, fails once, then signs in again", a
 test("a failed auth request restores the form for another attempt", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("姓名").fill("网络队员");
-  await page.getByLabel("邮箱").fill(`network-${Date.now()}@vprint.example`);
+  await page.getByLabel("邮箱").fill(`network-${crypto.randomUUID()}@vprint.example`);
   await page.getByLabel("密码").fill("correct horse battery staple");
   await page.route("**/api/auth/sign-up/email", (route) => route.abort());
   await page.getByRole("button", { name: "创建账号" }).click();
