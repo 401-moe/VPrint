@@ -72,6 +72,10 @@ function teamId(value: string) {
   return /^[a-f0-9-]{36}$/i.test(value);
 }
 
+function userId(value: string) {
+  return value.length > 0 && value.length <= 128;
+}
+
 async function requireUser(context: { env: AuthEnvironment; req: { raw: Request } }) {
   return getCurrentUser(context.env, context.req.raw.headers);
 }
@@ -181,6 +185,34 @@ teamsRoutes.put("/teams/:teamId/selection", async (context) => {
   if (result.meta.changes === 0) return context.json({ error: "team not found" }, 403);
 
   return context.json({ selectedTeamId: teamIdValue });
+});
+
+teamsRoutes.put("/teams/:teamId/ownership", async (context) => {
+  const user = await requireUser(context);
+  if (!user) return context.json({ error: "authentication required" }, 401);
+  const targetTeamId = context.req.param("teamId");
+  if (!teamId(targetTeamId)) return context.json({ error: "team not found" }, 404);
+
+  const body = await requestBody(context);
+  const nextOwnerUserId = (body as { userId?: unknown } | null)?.userId;
+  if (typeof nextOwnerUserId !== "string" || !userId(nextOwnerUserId)) {
+    return context.json({ error: "invalid team member" }, 400);
+  }
+
+  const transfer = await context.env.DB.prepare(`
+    WITH eligible AS MATERIALIZED (
+      SELECT current.userId AS previous, following.userId AS successor
+      FROM team_member current JOIN team_member following ON following.teamId = current.teamId
+      WHERE current.teamId = ? AND current.userId = ? AND current.role = 'owner'
+        AND following.userId = ? AND following.role = 'member'
+    )
+    UPDATE team_member SET role = CASE WHEN userId = ? THEN 'owner' ELSE 'member' END
+    WHERE teamId = ? AND userId IN (SELECT previous FROM eligible UNION ALL SELECT successor FROM eligible)
+    RETURNING userId
+  `).bind(targetTeamId, user.id, nextOwnerUserId, nextOwnerUserId, targetTeamId).all();
+  if (transfer.results.length !== 2) return context.json({ error: "无法转让队长。" }, 403);
+
+  return context.json({ ownerUserId: nextOwnerUserId });
 });
 
 teamsRoutes.get("/workspace", async (context) => {

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { createAuth, getCurrentUser, type AuthEnvironment } from "./auth";
+import { contestLifecycleRoutes } from "./contest-lifecycle";
 import { printoutsRoutes } from "./printouts";
 import { teamManagementRoutes } from "./team-management";
 import { teamsRoutes } from "./teams";
@@ -31,6 +32,7 @@ app.post("/api/cli/device/decision", decideDeviceRequest);
 app.get("/api/cli/me", getCliMe);
 app.post("/api/cli/logout", logoutCli);
 app.route("/api", teamsRoutes);
+app.route("/api", contestLifecycleRoutes);
 app.route("/api", printoutsRoutes);
 app.route("/api", teamManagementRoutes);
 

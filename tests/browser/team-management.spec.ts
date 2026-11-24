@@ -41,3 +41,26 @@ test("owners rotate the displayed invitation on removal; voluntary departure pre
     await memberContext.close();
   }
 });
+
+test("owner reviews counts, can cancel a contest deletion, and can dissolve the team", async ({ page }) => {
+  await page.goto("/");
+  await register(page, "队长");
+  await page.getByLabel("队伍名称").fill("决赛队");
+  await page.getByRole("button", { name: "创建队伍" }).click();
+  await page.getByLabel("比赛名称").fill("决赛");
+  await page.getByRole("button", { name: "创建比赛" }).click();
+  await page.getByRole("link", { name: "决赛", exact: true }).click();
+  await page.getByRole("button", { name: "删除比赛", exact: true }).click();
+  const contestDialog = page.getByRole("dialog", { name: "删除比赛" });
+  await expect(contestDialog).toContainText("0 份打印件");
+  await contestDialog.getByRole("button", { name: "取消" }).click();
+  await expect(page.getByRole("heading", { name: "决赛", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "返回队伍" }).click();
+  await page.getByRole("button", { name: "队伍设置" }).click();
+  await page.getByRole("button", { name: "解散队伍", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "解散队伍" });
+  await expect(dialog).toContainText("决赛队");
+  await expect(dialog).toContainText("1 场比赛、0 份打印件将永久删除");
+  await dialog.getByRole("button", { name: "确认解散队伍" }).click();
+  await expect(page.getByLabel("队伍名称")).toBeEditable();
+});

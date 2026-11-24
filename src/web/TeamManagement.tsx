@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 
+import { DeleteGroup } from "./DeleteGroup";
+
 interface Teammate {
   id: string;
   name: string;
@@ -25,13 +27,13 @@ export function TeamManagement({
   role,
   invitationUrl,
   onInvitationChange,
-  onLeftTeam,
+  onTeamChanged,
 }: {
   teamId: string;
   role: string;
   invitationUrl: string;
   onInvitationChange: (invitationUrl: string) => void;
-  onLeftTeam: () => void;
+  onTeamChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [teammates, setTeammates] = useState<Teammate[]>([]);
@@ -92,10 +94,18 @@ export function TeamManagement({
     });
   }
 
+  function transfer(teammate: Teammate) {
+    if (!window.confirm(`将队长转让给「${teammate.name}」？`)) return;
+    void run(async () => {
+      await requestJson(`/api/teams/${teamId}/ownership`, { method: "PUT", body: JSON.stringify({ userId: teammate.id }) });
+      onTeamChanged();
+    });
+  }
+
   function leaveTeam() {
     void run(async () => {
       await requestJson(`/api/teams/${teamId}/membership`, { method: "DELETE" });
-      onLeftTeam();
+      onTeamChanged();
     });
   }
 
@@ -149,17 +159,18 @@ export function TeamManagement({
                     <span role="cell">
                       {teammate.role === "owner" ? "队长" : "队员"}
                     </span>
-                    <span role="cell">{teammate.role === "member" && <button
+                    <span role="cell">{teammate.role === "member" && <><button
                       className="button secondary"
                       type="button"
                       disabled={pending}
                       onClick={() => removeTeammate(teammate.id)}
                     >
                       移除
-                    </button>}</span>
+                    </button> <button className="button secondary" type="button" disabled={pending} onClick={() => transfer(teammate)}>转让队长</button></>}</span>
                   </div>
                 ))}
               </div>
+              <DeleteGroup kind="team" id={teamId} onDeleted={onTeamChanged} />
             </>
           ) : (
             <button

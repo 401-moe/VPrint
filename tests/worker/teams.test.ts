@@ -102,6 +102,39 @@ async function leaveTeam(cookie: string, teamId: string) {
   }), env);
 }
 
+async function userId(cookie: string) {
+  return (
+    (await (
+      await worker.fetch(request("/api/me", { headers: { cookie } }), env)
+    ).json()) as { id: string }
+  ).id;
+}
+
+async function insertPrintout({
+  id,
+  contestId,
+  userId,
+  requestId,
+  filename,
+}: {
+  id: string;
+  contestId: string;
+  userId: string;
+  requestId: string;
+  filename: string;
+}) {
+  const result = await env.DB.prepare(
+    `
+      INSERT INTO printout (id, contestId, userId, requestId, filename, content, createdAt)
+      VALUES (?, ?, ?, ?, ?, 'int source', 1000)
+    `,
+  )
+    .bind(id, contestId, userId, requestId, filename)
+    .run();
+  if (!result.success) throw new Error("printout fixture failed");
+  return { contestId, filename };
+}
+
 beforeAll(async () => {
   await applyD1Migrations(env.DB, inject("d1Migrations"));
 });
@@ -602,4 +635,170 @@ test("cross-origin browser form posts cannot mutate team management routes", asy
     body: "{}",
   }), env);
   expect(crossOriginReset.status).toBe(403);
+});
+
+test("the current owner can transfer ownership to an existing member", async () => {
+  const suffix = crypto.randomUUID();
+  const [{ cookie: ownerCookie }, { cookie: memberCookie }] = await Promise.all([
+    signUp({
+      email: `transfer-owner-${suffix}@vprint.example`,
+      password: "correct horse battery staple",
+      name: "原队长",
+    }),
+    signUp({
+      email: `transfer-member-${suffix}@vprint.example`,
+      password: "correct horse battery staple",
+      name: "新队长",
+    }),
+  ]);
+  const team = await createTeam(ownerCookie, "火苗");
+  await join(memberCookie, team.invitationToken);
+  const member = (await (
+    await worker.fetch(request("/api/me", { headers: { cookie: memberCookie } }), env)
+  ).json()) as { id: string };
+
+  for (const [cookie, target] of [[memberCookie, member.id], [ownerCookie, "unknown"]]) {
+    const denied = await worker.fetch(request(`/api/teams/${team.id}/ownership`, {
+      method: "PUT", headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ userId: target }),
+    }), env);
+    expect(denied.status).toBe(403);
+  }
+
+  const transfer = await worker.fetch(
+    request(`/api/teams/${team.id}/ownership`, {
+      method: "PUT",
+      headers: { "content-type": "application/json", cookie: ownerCookie },
+      body: JSON.stringify({ userId: member.id }),
+    }),
+    env,
+  );
+  expect(transfer.status).toBe(200);
+  expect(((await transfer.json()) as { ownerUserId: string }).ownerUserId).toBe(member.id);
+
+  for (const [cookie, expectedRole] of [
+    [ownerCookie, "member"],
+    [memberCookie, "owner"],
+  ] as const) {
+    const currentWorkspace = await workspace(cookie);
+    const currentTeam = ((await currentWorkspace.json()) as {
+      teams: { id: string; role: string }[];
+    }).teams.find((listedTeam) => listedTeam.id === team.id);
+    expect(currentTeam?.role).toBe(expectedRole);
+  }
+});
+
+test("only the current owner can delete a selected contest and its printouts", async () => {
+  const suffix = crypto.randomUUID();
+  const [{ cookie: ownerCookie }, { cookie: memberCookie }] = await Promise.all([
+    signUp({
+      email: `contest-owner-${suffix}@vprint.example`,
+      password: "correct horse battery staple",
+      name: "队长",
+    }),
+    signUp({
+      email: `contest-member-${suffix}@vprint.example`,
+      password: "correct horse battery staple",
+      name: "队员",
+    }),
+  ]);
+  const team = await createTeam(ownerCookie, "火苗");
+  await join(memberCookie, team.invitationToken);
+  const ownerId = await userId(ownerCookie);
+  const contests = await Promise.all(
+    ["周六训练", "周日训练"].map((name) =>
+      worker.fetch(
+        request(`/api/teams/${team.id}/contests`, {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie: ownerCookie },
+          body: JSON.stringify({ name }),
+        }),
+        env,
+      ),
+    ),
+  );
+  const [saturday, sunday] = await Promise.all(
+    contests.map((response) => response.json() as Promise<{ id: string }>),
+  );
+  const inserted = await insertPrintout({
+    id: crypto.randomUUID(),
+    contestId: saturday.id,
+    userId: ownerId,
+    requestId: crypto.randomUUID(),
+    filename: "A.cpp",
+  });
+  await insertPrintout({
+    id: crypto.randomUUID(),
+    contestId: sunday.id,
+    userId: ownerId,
+    requestId: crypto.randomUUID(),
+    filename: "B.cpp",
+  });
+  expect(
+    await env.DB.prepare(
+      `SELECT COUNT(*) AS printoutCount FROM printout WHERE contestId = ?`,
+    )
+      .bind(inserted.contestId)
+      .first(),
+  ).toEqual({ printoutCount: 1 });
+
+  const memberPreview = await worker.fetch(
+    request(`/api/contests/${saturday.id}/deletion`, {
+      headers: { cookie: memberCookie },
+    }),
+    env,
+  );
+  expect(memberPreview.status).toBe(403);
+  const memberDelete = await worker.fetch(
+    request(`/api/contests/${saturday.id}/deletion`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json", cookie: memberCookie },
+      body: "{}",
+    }),
+    env,
+  );
+  expect(memberDelete.status).toBe(403);
+
+  const previewResponse = await worker.fetch(
+    request(`/api/contests/${saturday.id}/deletion`, {
+      headers: { cookie: ownerCookie },
+    }),
+    env,
+  );
+  const previewBody = await previewResponse.json();
+  expect(previewResponse.status).toBe(200);
+  expect(previewBody).toEqual({
+    id: inserted.contestId,
+    name: "周六训练",
+    teamName: "火苗",
+    printoutCount: 1,
+  });
+
+  const deletion = await worker.fetch(
+    request(`/api/contests/${saturday.id}/deletion`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json", cookie: ownerCookie },
+      body: "{}",
+    }),
+    env,
+  );
+  expect(deletion.status).toBe(200);
+
+  const deletedWorkspace = await workspace(ownerCookie, saturday.id);
+  expect(deletedWorkspace.status).toBe(403);
+  const remainingWorkspace = await workspace(ownerCookie, sunday.id);
+  expect(remainingWorkspace.status).toBe(200);
+  expect(((await remainingWorkspace.json()) as { contests: { id: string }[] }).contests.map(
+    (contest) => contest.id,
+  )).toEqual([sunday.id]);
+  const endpoint = `/api/teams/${team.id}/deletion`;
+  const totals = await worker.fetch(request(endpoint, { headers: { cookie: ownerCookie } }), env);
+  expect(await totals.json()).toMatchObject({ name: "火苗", contestCount: 1, printoutCount: 1 });
+  const denied = await worker.fetch(request(endpoint, { method: "DELETE", headers: { cookie: memberCookie } }), env);
+  expect(denied.status).toBe(403);
+  const dissolved = await worker.fetch(request(endpoint, { method: "DELETE", headers: { cookie: ownerCookie } }), env);
+  expect(dissolved.status).toBe(200);
+  expect(await env.DB.prepare("SELECT COUNT(*) FROM printout WHERE contestId IN (?, ?)").bind(saturday.id, sunday.id).first("COUNT(*)")).toBe(0);
+  expect((await join(memberCookie, team.invitationToken)).status).toBe(404);
+
 });

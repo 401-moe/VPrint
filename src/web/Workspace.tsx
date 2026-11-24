@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { TeamManagement } from "./TeamManagement";
 
+import { DeleteGroup } from "./DeleteGroup";
 import { PrintList, PrintPage } from "./ContestPrints";
 
 interface Member {
@@ -240,6 +241,7 @@ export function Workspace({
           </button>
         </header>
         <PrintList contestId={workspace.contest.id} />
+        {selectedTeam?.role === "owner" && <DeleteGroup kind="contest" id={workspace.contest.id} onDeleted={() => void returnToTeam()} />}
       </section>
     );
   }
@@ -318,7 +320,7 @@ export function Workspace({
               role={selectedTeam.role}
               invitationUrl={invitationUrl}
               onInvitationChange={setInvitationUrl}
-              onLeftTeam={() => void loadWorkspace()}
+              onTeamChanged={() => void loadWorkspace()}
             />
           )}
 
