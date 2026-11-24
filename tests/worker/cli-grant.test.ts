@@ -176,8 +176,26 @@ test("an approved CLI exchanges once, uses DPoP, and logs out through the grant 
   );
   expect(secondExchange.status).toBe(400);
 
+  const refreshToken = async (refresh: string) => {
+    const dpop = await new SignJWT({ htu: loopbackOrigin + "/api/auth/oauth2/token", htm: "POST" })
+      .setProtectedHeader({ alg: "ES256", typ: "dpop+jwt", jwk: publicKey })
+      .setJti(crypto.randomUUID()).setIssuedAt().sign(privateKey);
+    return worker.fetch(request("/api/auth/oauth2/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", dpop },
+      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refresh, client_id: "vprint-cli", resource: audience }),
+    }), env);
+  };
+  const before = await env.DB.prepare("SELECT id, approvedAt, expiresAt FROM vprint_cli_grant WHERE keyThumbprint = ?").bind(thumbprint).first<{ id: string; approvedAt: number; expiresAt: number }>();
+  expect(before!.expiresAt - before!.approvedAt).toBe(8 * 3600);
+  const renewed = await refreshToken(tokens.refresh_token);
+  expect(renewed.status, renewed.ok ? "renew the same CLI grant" : await renewed.clone().text()).toBe(200);
+  const fresh = await renewed.json<typeof tokens>();
+  expect(fresh.token_type).toBe("DPoP");
+  const effectiveRefresh = fresh.refresh_token ?? tokens.refresh_token;
+  expect(await env.DB.prepare("SELECT id, approvedAt, expiresAt FROM vprint_cli_grant WHERE keyThumbprint = ?").bind(thumbprint).first()).toEqual(before);
   const secondProof = await createResourceProof(
-    tokens.access_token,
+    fresh.access_token,
     privateKey,
     publicKey,
     "POST",
@@ -187,7 +205,7 @@ test("an approved CLI exchanges once, uses DPoP, and logs out through the grant 
     request("/api/cli/logout", {
       method: "POST",
       headers: {
-        authorization: `DPoP ${tokens.access_token}`,
+        authorization: `DPoP ${fresh.access_token}`,
         dpop: secondProof,
       },
     }),
@@ -196,7 +214,7 @@ test("an approved CLI exchanges once, uses DPoP, and logs out through the grant 
   expect(logout.status).toBe(200);
 
   const thirdProof = await createResourceProof(
-    tokens.access_token,
+    fresh.access_token,
     privateKey,
     publicKey,
     "GET",
@@ -205,13 +223,14 @@ test("an approved CLI exchanges once, uses DPoP, and logs out through the grant 
   const afterLogout = await worker.fetch(
     request("/api/cli/me", {
       headers: {
-        authorization: `DPoP ${tokens.access_token}`,
+        authorization: `DPoP ${fresh.access_token}`,
         dpop: thirdProof,
       },
     }),
     env,
   );
   expect(afterLogout.status).toBe(401);
+  expect((await refreshToken(effectiveRefresh)).status).toBe(400);
 });
 
 async function createResourceProof(

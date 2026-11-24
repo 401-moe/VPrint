@@ -1,15 +1,8 @@
 import { Hono } from "hono";
-import { createAuth, type AuthEnvironment } from "./auth";
-import {
-  captureDeviceRequest,
-  decideDeviceRequest,
-  getDeviceRequest,
-} from "./cli-device";
-import {
-  cliToken,
-  getCliMe,
-  logoutCli,
-} from "./cli";
+import { createAuth, getCurrentUser, type AuthEnvironment } from "./auth";
+import { teamsRoutes } from "./teams";
+import { captureDeviceRequest, decideDeviceRequest, getDeviceRequest } from "./cli-device";
+import { cliToken, getCliMe, logoutCli } from "./cli";
 
 export interface Environment extends AuthEnvironment {
   ASSETS: { fetch: (request: Request) => Promise<Response> };
@@ -25,24 +18,19 @@ app.all("/api/auth/*", (context) => {
   return auth.handler(context.req.raw);
 });
 
-app.get("/api/cli/device", (context) => getDeviceRequest(context));
-app.post("/api/cli/device/decision", (context) => decideDeviceRequest(context));
-app.get("/api/cli/me", (context) => getCliMe(context));
-app.post("/api/cli/logout", (context) => logoutCli(context));
+app.get("/api/cli/device", getDeviceRequest);
+app.post("/api/cli/device/decision", decideDeviceRequest);
+app.get("/api/cli/me", getCliMe);
+app.post("/api/cli/logout", logoutCli);
+app.route("/api", teamsRoutes);
 
 app.get("/api/me", async (context) => {
-  const auth = createAuth(context.env);
-  const session = await auth.api.getSession({ headers: context.req.raw.headers });
-
-  if (!session) {
+  const user = await getCurrentUser(context.env, context.req.raw.headers);
+  if (!user) {
     return context.json({ error: "authentication required" }, 401);
   }
 
-  return context.json({
-    id: session.user.id,
-    email: session.user.email,
-    name: session.user.name,
-  });
+  return context.json(user);
 });
 
 app.get("*", (context) => context.env.ASSETS.fetch(context.req.raw));

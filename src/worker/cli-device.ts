@@ -63,7 +63,7 @@ export async function captureDeviceRequest(
   const response = await createAuth(context.env, true).handler(context.req.raw);
   if (!response.ok) return response;
 
-  const body = await response.clone().json<{ device_code?: string; user_code?: string }>();
+  const body = await response.clone().json() as { device_code?: string; user_code?: string };
   if (!body.device_code || !body.user_code) return response;
 
   const now = Math.floor(Date.now() / 1000);

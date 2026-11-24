@@ -5,11 +5,28 @@ import {
   oauthProvider,
 } from "@better-auth/oauth-provider";
 import type { D1Database } from "@cloudflare/workers-types";
+import { createEmailOtpPlugin } from "./email-otp";
 
 export interface AuthEnvironment {
   DB: D1Database;
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;
+  EMAIL: SendEmail;
+}
+
+interface SendEmail {
+  send: (message: {
+    to: string;
+    from: string;
+    subject: string;
+    text: string;
+  }) => Promise<void>;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
 }
 
 export function createAuthOptions(env: AuthEnvironment, cliProtocol = false): BetterAuthOptions {
@@ -22,6 +39,7 @@ export function createAuthOptions(env: AuthEnvironment, cliProtocol = false): Be
       enabled: true,
     },
     plugins: [
+      createEmailOtpPlugin(env),
       jwt(),
       oauthProvider({
         scopes: [
@@ -56,4 +74,15 @@ export function createAuthOptions(env: AuthEnvironment, cliProtocol = false): Be
 
 export function createAuth(env: AuthEnvironment, cliProtocol = false) {
   return betterAuth(createAuthOptions(env, cliProtocol));
+}
+
+export async function getCurrentUser(env: AuthEnvironment, headers: Headers) {
+  const session = await createAuth(env).api.getSession({ headers });
+  if (!session) return null;
+
+  return {
+    id: session.user.id,
+    email: session.user.email,
+    name: session.user.name,
+  } satisfies AuthUser;
 }

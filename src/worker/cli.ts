@@ -45,13 +45,14 @@ export async function cliToken(c: CliContext) {
 
   const response = await createAuth(c.env, true).handler(request);
   if (!response.ok) return response;
-  const tokens = await response.clone().json<{ access_token?: string; refresh_token?: string; token_type?: string }>();
-  if (tokens.token_type?.toLowerCase() !== "dpop" || !tokens.access_token || !tokens.refresh_token) return invalidGrant(c);
+  const tokens = await response.clone().json() as { access_token?: string; refresh_token?: string; token_type?: string };
+  if (tokens.token_type?.toLowerCase() !== "dpop" || !tokens.access_token || (exchange && !tokens.refresh_token)) return invalidGrant(c);
   // This JWT comes directly from the provider above, after it validated the grant and DPoP.
   const claims = decodeJwt(tokens.access_token);
   const jkt = (claims.cnf as { jkt?: unknown } | undefined)?.jkt;
   if (typeof jkt !== "string" || typeof claims.sub !== "string") return invalidGrant(c);
-  const newHash = await digest(tokens.refresh_token);
+  // A sender-constrained refresh may issue only a new access token (RFC 6749 §6).
+  const newHash = tokens.refresh_token ? await digest(tokens.refresh_token) : oldRefreshHash!;
   const now = nowSeconds();
   const statement = exchange
     ? c.env.DB.prepare(
