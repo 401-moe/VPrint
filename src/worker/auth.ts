@@ -5,6 +5,7 @@ import {
   oauthProvider,
 } from "@better-auth/oauth-provider";
 import type { D1Database } from "@cloudflare/workers-types";
+import { githubSignIn } from "./github";
 import { createEmailOtpPlugin } from "./email-otp";
 
 export interface AuthEnvironment {
@@ -12,6 +13,8 @@ export interface AuthEnvironment {
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;
   EMAIL: SendEmail;
+  GITHUB_CLIENT_ID?: string;
+  GITHUB_CLIENT_SECRET?: string;
 }
 
 interface SendEmail {
@@ -40,6 +43,7 @@ export function createAuthOptions(env: AuthEnvironment, cliProtocol = false): Be
     },
     plugins: [
       createEmailOtpPlugin(env),
+      githubSignIn(env),
       jwt(),
       oauthProvider({
         scopes: [

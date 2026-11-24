@@ -16,6 +16,12 @@ const app = new Hono<{ Bindings: Environment }>();
 app.post("/api/auth/device/code", captureDeviceRequest);
 app.post("/api/auth/oauth2/token", cliToken);
 
+app.get("/api/auth/callback/github", context => {
+  const url = new URL(context.req.url);
+  url.pathname = "/api/auth/github/verified-callback";
+  return createAuth(context.env).handler(new Request(url, context.req.raw));
+});
+
 app.all("/api/auth/*", (context) => {
   const auth = createAuth(context.env);
   return auth.handler(context.req.raw);
