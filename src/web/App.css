@@ -59,7 +59,7 @@ body {
 }
 
 .workspace-toolbar {
-  grid-template-columns: minmax(12rem, 1fr) auto;
+  grid-template-columns: minmax(12rem, 1fr) auto auto;
 }
 
 .invitation {
@@ -68,6 +68,46 @@ body {
 
 .inline-form {
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.team-settings {
+  margin-bottom: 1rem;
+}
+
+.team-settings-body {
+  border: 1px solid #e2e8ee;
+  border-radius: 0.4rem;
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+}
+
+.team-settings .invitation {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  margin-bottom: 0;
+}
+
+.team-settings .reset-form {
+  display: contents;
+}
+
+.member-list {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.member-list li {
+  align-items: center;
+  border: 1px solid #e2e8ee;
+  border-radius: 0.4rem;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 0.5rem 0.75rem;
 }
 
 .role {
