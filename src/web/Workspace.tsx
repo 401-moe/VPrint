@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { TeamManagement } from "./TeamManagement";
 
 import { PrintList, PrintPage } from "./ContestPrints";
 
@@ -114,8 +115,13 @@ export function Workspace({
       }))
       .then(() => loadWorkspace())
       .catch((cause: unknown) => {
-        setWorkspaceState({ status: "denied" });
-        setWorkspaceError(cause instanceof Error ? cause.message : "邀请链接无效。");
+        window.history.replaceState(null, "", "/");
+        void loadWorkspace();
+        setWorkspaceError(
+          cause instanceof Error && cause.message === "authentication required"
+            ? "请登录后使用邀请链接。"
+            : "邀请链接无效。",
+        );
       });
   }, [loadWorkspace]);
 
@@ -305,24 +311,16 @@ export function Workspace({
             </button>
           </div>
 
-          <div className="invitation">
-            <label className="field">
-              邀请链接
-              <input
-                readOnly
-                value={invitationUrl}
-                onFocus={(event) => event.target.select()}
-              />
-            </label>
-            <button
-              className="button secondary"
-              type="button"
-              onClick={() => navigator.clipboard.writeText(invitationUrl)}
-              disabled={!invitationUrl}
-            >
-              复制邀请
-            </button>
-          </div>
+          {selectedTeam && (
+            <TeamManagement
+              key={selectedTeam.id}
+              teamId={selectedTeam.id}
+              role={selectedTeam.role}
+              invitationUrl={invitationUrl}
+              onInvitationChange={setInvitationUrl}
+              onLeftTeam={() => void loadWorkspace()}
+            />
+          )}
 
           <form className="inline-form" onSubmit={createContest}>
             <label className="field">

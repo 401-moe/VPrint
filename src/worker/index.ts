@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { createAuth, getCurrentUser, type AuthEnvironment } from "./auth";
 import { printoutsRoutes } from "./printouts";
+import { teamManagementRoutes } from "./team-management";
 import { teamsRoutes } from "./teams";
 import { captureDeviceRequest, decideDeviceRequest, getDeviceRequest } from "./cli-device";
 import { cliToken, getCliMe, logoutCli } from "./cli";
@@ -25,6 +26,7 @@ app.get("/api/cli/me", getCliMe);
 app.post("/api/cli/logout", logoutCli);
 app.route("/api", teamsRoutes);
 app.route("/api", printoutsRoutes);
+app.route("/api", teamManagementRoutes);
 
 app.get("/api/me", async (context) => {
   const user = await getCurrentUser(context.env, context.req.raw.headers);
