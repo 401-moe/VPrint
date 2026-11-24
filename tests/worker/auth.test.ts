@@ -116,3 +116,28 @@ test("a member can sign up, leave, sign in again, and keep the same account", as
   const restoredUser = restored.user as { id: string } | undefined;
   expect(restoredUser?.id).toBe(createdUser?.id);
 });
+
+test("the CLI can start device authorization with its host metadata", async () => {
+  const response = await worker.fetch(
+    request("/api/auth/device/code", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "x-vprint-hostname": encodeURIComponent("机房主机"),
+        "x-vprint-os": "linux",
+      },
+      body: new URLSearchParams({
+        client_id: "vprint-cli",
+        scope: "offline_access vprint:teams:read vprint:print",
+        resource: "https://vprint.401.moe/api",
+      }).toString(),
+    }),
+    env,
+  );
+
+  expect(response.status).toBe(200);
+  const body = await json(response);
+  expect(body.user_code).toMatch(/^[A-Z0-9-]+$/);
+  expect(body.verification_uri).toBe(`${loopbackOrigin}/device`);
+  expect(body.device_code).toEqual(expect.any(String));
+});
