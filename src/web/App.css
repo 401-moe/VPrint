@@ -250,3 +250,7 @@ body {
 .device-card dl { display: grid; grid-template-columns: auto 1fr; gap: 0.6rem 1rem; }
 .device-card dt { color: #596877; }
 .device-card dd { margin: 0; }
+
+.session-list { list-style: none; padding: 0; }
+.session-list li { border-top: 1px solid #d8e0e8; padding: 1rem 0; }
+.session-device { display: block; overflow-wrap: anywhere; }

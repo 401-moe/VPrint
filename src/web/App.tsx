@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { AccountSettings } from "./AccountSettings";
 import { DevicePage } from "./DevicePage";
 import "./App.css";
 import { GithubChoice, openGithub } from "./GithubChoice";
@@ -314,6 +315,7 @@ export function App() {
     );
   }
 
+  if (location.pathname === "/account") return <AccountSettings email={member.email} />;
   if (location.pathname === "/device") return <DevicePage email={member.email} />;
 
   return (
