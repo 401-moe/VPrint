@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { DevicePage } from "./DevicePage";
 import "./App.css";
 import { Workspace } from "./Workspace";
@@ -22,6 +22,8 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [returnTo, setReturnTo] = useState<string | null>(null);
+  const emailInput = useRef<HTMLInputElement>(null);
+  const [sentTo, setSentTo] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -86,6 +88,7 @@ export function App() {
   }
 
   async function requestOtp() {
+    if (!emailInput.current?.reportValidity()) return;
     setPending(true);
     setError(null);
 
@@ -101,6 +104,7 @@ export function App() {
         setError(body.message ?? "验证码发送失败，请稍后重试。");
         return;
       }
+      setSentTo(form.email);
     } catch {
       setError("网络异常，请稍后重试。");
     } finally {
@@ -111,7 +115,7 @@ export function App() {
   function switchMode(nextMode: Mode) {
     setMode(nextMode);
     setError(null);
-    if (mode === "signin" && nextMode === "otp") void requestOtp();
+    if (nextMode === "otp") emailInput.current?.focus();
   }
 
   async function signInWithOtp() {
@@ -213,6 +217,7 @@ export function App() {
             <label className="field">
               邮箱
               <input
+                ref={emailInput}
                 name="email"
                 type="email"
                 autoComplete="email"
@@ -250,6 +255,17 @@ export function App() {
                 />
               </label>
             )}
+            {mode === "otp" && (
+              <button
+                className="button secondary"
+                type="button"
+                disabled={pending}
+                onClick={() => void requestOtp()}
+              >
+                发送验证码
+              </button>
+            )}
+            {mode === "otp" && sentTo === form.email && sentTo && <p role="status">验证码已发送至 {sentTo}</p>}
             {error && (
               <p className="error" role="alert">
                 {error}
@@ -265,6 +281,7 @@ export function App() {
                     : "登录"}
             </button>
           </form>
+          {mode !== "signup" && <button className="button secondary" type="button" disabled={pending} onClick={() => switchMode("signup")}>第一次使用？创建账号</button>}
           <button
             className="button secondary"
             type="button"

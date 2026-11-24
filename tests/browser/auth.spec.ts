@@ -1,25 +1,16 @@
 import { expect, test } from "@playwright/test";
-async function sentOtp() {
-  const port = process.env.VPRINT_E2E_PORT ?? "8801";
-  const response = await fetch(
-    `http://127.0.0.1:${port}/cdn-cgi/local/explorer/api/local/email/sending`,
-  );
-  const body = await response.json();
-  if (!response.ok || !Array.isArray(body.result) || body.result.length === 0) {
-    throw new Error(`local explorer failed: ${response.status} ${JSON.stringify(body)}`);
-  }
-  const items = body.result as { messageId?: string }[];
-  const message = items.at(-1)?.messageId;
-  if (!message) throw new Error(`local sent email has no message ID: ${JSON.stringify(items)}`);
-  const messageId = message.replace(/^<|>$/g, "");
-  const detail = await fetch(
-    `http://127.0.0.1:${port}/cdn-cgi/local/explorer/api/local/email/sending?email_id=${encodeURIComponent(messageId ?? "")}`,
-  );
-  const detailBody = await detail.json();
-  if (!detail.ok) {
-    throw new Error(`local email detail failed: ${detail.status} ${JSON.stringify(detailBody)}`);
-  }
-  return (detailBody.result as { text?: string }).text?.match(/\b\d{6}\b/)?.[0];
+async function sentOtp(baseURL: string, email: string) {
+  const url = new URL("/cdn-cgi/local/explorer/api/local/email/sending", baseURL);
+  const list = await fetch(url);
+  if (!list.ok) throw new Error("Local email capture unavailable: " + list.status);
+  const { result } = await list.json() as { result: { messageId: string; to: string[] }[] };
+  const message = result.find(item => item.to.includes(email));
+  if (!message) return undefined;
+  url.searchParams.set("email_id", message.messageId.replace(/^<|>$/g, ""));
+  const detail = await fetch(url);
+  if (!detail.ok) throw new Error("Local email detail unavailable: " + detail.status);
+  const body = await detail.json() as { result: { text: string } };
+  return body.result.text.match(/\b\d{6}\b/)?.[0];
 }
 
 test("a member signs up, reloads, signs out, fails once, then signs in again", async ({ page }) => {
@@ -82,8 +73,8 @@ test("a failed auth request restores the form for another attempt", async ({ pag
   await expect(page.getByRole("button", { name: "创建账号" })).toBeEnabled();
 });
 
-test("a member signs in by email OTP and returns to the original location", async ({ page }) => {
-  const email = `otp-${Date.now()}@vprint.example`;
+test("a member signs in by email OTP and returns to the original location", async ({ page, baseURL }) => {
+  const email = `otp-${crypto.randomUUID()}@vprint.example`;
   const password = "correct horse battery staple";
   await page.goto("/invite/example?next=%2Fdevice%2F123");
   await expect(page.getByRole("button", { name: "登录" })).toBeVisible();
@@ -92,7 +83,7 @@ test("a member signs in by email OTP and returns to the original location", asyn
   await page.getByLabel("邮箱").fill(email);
   await page.getByLabel("密码").fill(password);
   await page.getByRole("button", { name: "创建账号" }).click();
-  await expect(page.getByRole("heading", { name: "已登录" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "工作台" })).toBeVisible();
   const memberId = await page.evaluate(async () => {
     const response = await fetch("/api/me");
     return (await response.json()) as { id: string };
@@ -102,13 +93,15 @@ test("a member signs in by email OTP and returns to the original location", asyn
 
   await page.getByLabel("邮箱").fill(email);
   await page.getByRole("button", { name: "使用邮箱验证码" }).click();
-  expect
-    .poll(sentOtp, { timeout: 10_000, intervals: [100, 250, 500] })
+  await expect(page.getByLabel("邮箱")).toBeFocused();
+  await page.getByRole("button", { name: "发送验证码" }).click();
+  await expect
+    .poll(() => sentOtp(baseURL!, email), { timeout: 10_000, intervals: [100, 250, 500] })
     .toBeDefined();
-  const otp = await sentOtp();
+  const otp = await sentOtp(baseURL!, email);
   expect(otp).toBeDefined();
 
-  await page.getByLabel("验证码").fill("000000");
+  await page.getByLabel("验证码").fill(otp === "000000" ? "000001" : "000000");
   await page.getByRole("button", { name: "验证并登录" }).click();
   await expect(page.getByRole("alert")).toContainText("Invalid OTP");
 
@@ -124,4 +117,33 @@ test("a member signs in by email OTP and returns to the original location", asyn
     )
     .toEqual(memberId);
   await expect(page).toHaveURL("/invite/example?next=%2Fdevice%2F123");
+});
+
+test("a new mailbox owner can sign in with an email OTP first", async ({ page, baseURL }) => {
+  const email = `otp-first-${crypto.randomUUID()}@vprint.example`;
+  await page.goto("/");
+  await page.getByRole("button", { name: "已有账号？去登录" }).click();
+  await page.getByRole("button", { name: "使用邮箱验证码" }).click();
+  await expect(page.getByLabel("邮箱")).toBeFocused();
+  await expect(page.getByLabel("邮箱")).toHaveValue("");
+
+  await page.getByLabel("邮箱").fill(email);
+  await page.getByRole("button", { name: "发送验证码" }).click();
+  await expect
+    .poll(() => sentOtp(baseURL!, email), { timeout: 10_000, intervals: [100, 250, 500] })
+    .toBeDefined();
+  const otp = await sentOtp(baseURL!, email);
+  expect(otp).toBeDefined();
+
+  await page.getByLabel("验证码").fill(otp ?? "");
+  await page.getByRole("button", { name: "验证并登录" }).click();
+  await expect(page.getByText(email)).toBeVisible();
+  await expect
+    .poll(async () =>
+      page.evaluate(async () => {
+        const response = await fetch("/api/me");
+        return (await response.json()) as { email: string };
+      }),
+    )
+    .toMatchObject({ email });
 });

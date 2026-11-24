@@ -145,6 +145,7 @@ test("a member can sign in with an email OTP and cannot reuse the OTP", async ()
     { ...env, EMAIL: { send: async (message) => sentEmails.push(message) } },
   );
   expect(signUp.status).toBe(200);
+  const unverifiedSessionCookies = cookies(signUp);
   const created = await json(signUp);
   const createdUser = created.user as { id: string };
 
@@ -202,4 +203,84 @@ test("a member can sign in with an email OTP and cannot reuse the OTP", async ()
     { ...env, EMAIL: { send: async (message) => sentEmails.push(message) } },
   );
   expect(authenticated.ok).toBe(true);
+
+  const revokedBeforePromotion = await worker.fetch(
+    request("/api/me", { headers: { cookie: unverifiedSessionCookies } }),
+    { ...env, EMAIL: { send: async (message) => sentEmails.push(message) } },
+  );
+  expect(revokedBeforePromotion.status).toBe(401);
+
+  const signOut = await worker.fetch(
+    request("/api/auth/sign-out", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: otpCookies,
+        origin: loopbackOrigin,
+      },
+      body: "{}",
+    }),
+    { ...env, EMAIL: { send: async (message) => sentEmails.push(message) } },
+  );
+  expect(signOut.status).toBe(200);
+
+  const preClaimPassword = await worker.fetch(
+    request("/api/auth/sign-in/email", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: loopbackOrigin },
+      body: JSON.stringify({ email, password: "correct horse battery staple" }),
+    }),
+    { ...env, EMAIL: { send: async (message) => sentEmails.push(message) } },
+  );
+  expect(preClaimPassword.status).toBe(401);
+  expect(cookies(preClaimPassword)).toBe("");
+});
+
+test("a new mailbox owner can use an email OTP as the first sign-in method", async () => {
+  const sentEmails: EmailMessage[] = [];
+  const email = "otp-first-member@vprint.example";
+  const emailBinding = { ...env, EMAIL: { send: async (message: EmailMessage) => sentEmails.push(message) } };
+
+  const requestOtp = await worker.fetch(
+    request("/api/auth/email-otp/send-verification-otp", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: loopbackOrigin },
+      body: JSON.stringify({ email, type: "sign-in" }),
+    }),
+    emailBinding,
+  );
+  expect(requestOtp.status).toBe(200);
+  expect(sentEmails.at(-1)?.to).toBe(email);
+  const otp = sentEmails.at(-1)?.text.match(/\b\d{6}\b/)?.[0];
+  expect(otp).toBeDefined();
+
+  const signIn = await worker.fetch(
+    request("/api/auth/sign-in/email-otp", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: loopbackOrigin },
+      body: JSON.stringify({ email, otp, name: "OTP First Member" }),
+    }),
+    emailBinding,
+  );
+  const created = await json(signIn);
+  expect(signIn.ok, JSON.stringify(created)).toBe(true);
+  expect(created.user).toMatchObject({ email, name: "OTP First Member" });
+
+  const authenticated = await worker.fetch(
+    request("/api/me", { headers: { cookie: cookies(signIn) } }),
+    emailBinding,
+  );
+  expect(authenticated.status).toBe(200);
+  expect(await authenticated.json()).toMatchObject({ email, name: "OTP First Member" });
+
+  const noPassword = await worker.fetch(
+    request("/api/auth/sign-in/email", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: loopbackOrigin },
+      body: JSON.stringify({ email, password: "not a registered password" }),
+    }),
+    emailBinding,
+  );
+  expect(noPassword.status).toBe(401);
+  expect(cookies(noPassword)).toBe("");
 });
