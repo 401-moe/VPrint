@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Github, KeyRound } from "lucide-react";
 import { DevicePage } from "./DevicePage";
 import { GithubChoice, openGithub } from "./GithubChoice";
@@ -60,6 +60,7 @@ export function App() {
   const [returnTo, setReturnTo] = useState<string>(loginDestination);
   const emailInput = useRef<HTMLInputElement>(null);
   const passwordInput = useRef<HTMLInputElement>(null);
+  const focusAfterSwitch = useRef(false);
   const otpInput = useRef<HTMLInputElement>(null);
   const [sentTo, setSentTo] = useState("");
   const [showPasswordReset, setShowPasswordReset] = useState(
@@ -92,6 +93,14 @@ export function App() {
     window.addEventListener("popstate", syncPath);
     return () => window.removeEventListener("popstate", syncPath);
   }, []);
+
+  useLayoutEffect(() => {
+    if (!focusAfterSwitch.current) return;
+    focusAfterSwitch.current = false;
+    if (mode === "signup") document.getElementById("signup-name")?.focus();
+    else if (mode === "signin" && emailInput.current?.value) passwordInput.current?.focus();
+    else emailInput.current?.focus();
+  }, [mode, showPasswordReset]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -149,13 +158,9 @@ export function App() {
   function switchMode(nextMode: Mode) {
     if (mode === nextMode || (githubBinding && nextMode === "signup")) return;
     setEmail(emailInput.current?.value ?? "");
+    focusAfterSwitch.current = true;
     setMode(nextMode);
     setError(null);
-    requestAnimationFrame(() => {
-      if (nextMode === "signup") document.getElementById("signup-name")?.focus();
-      else if (nextMode === "signin" && emailInput.current?.value) passwordInput.current?.focus();
-      else emailInput.current?.focus();
-    });
   }
 
   function restoreLocation() {
@@ -210,7 +215,7 @@ export function App() {
           setError(null);
           setShowPasswordReset(false);
           history.replaceState(null, "", "/login?next=" + encodeURIComponent(returnTo));
-          requestAnimationFrame(() => passwordInput.current?.focus());
+          focusAfterSwitch.current = true;
         }} />
     </main></div></>;
   }
