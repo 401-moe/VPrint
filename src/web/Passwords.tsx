@@ -26,14 +26,14 @@ export function PasswordReset({ initialEmail, firstPassword, signedIn, onReturn 
   async function requestCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
+    const address = String(new FormData(event.currentTarget).get("email")).trim().toLowerCase();
     setBusy(true);
     setError("");
     try {
       await api("/api/auth/email-otp/request-password-reset", {
         method: "POST",
-        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        body: JSON.stringify({ email: address }),
       }, "验证码发送失败，请稍后重试。");
-      const address = email.trim().toLowerCase();
       setChallenge(address);
       setEmail(address);
     } catch (cause) {
@@ -83,7 +83,8 @@ export function PasswordReset({ initialEmail, firstPassword, signedIn, onReturn 
             <Button className="vp-primary" onClick={() => onReturn(email, true)}>重新登录</Button>
           </div>
         ) : challenge ? (
-          <form className="vp-form" onSubmit={reset} onChange={() => setError("")}>
+          <form key="reset" id="reset-password-form" method="post" className="vp-form" onSubmit={reset} onChange={() => setError("")}>
+            <input hidden readOnly type="email" id="reset-username" name="username" autoComplete="username" value={challenge} />
             <div className="recovery-address">
               <span>{challenge}</span>
               {!signedIn && <button type="button" className="password-recovery-link" disabled={busy}
@@ -104,10 +105,10 @@ export function PasswordReset({ initialEmail, firstPassword, signedIn, onReturn 
             <Button type="submit" className="vp-primary" disabled={busy}>{firstPassword ? "设置密码" : "重置密码"}</Button>
           </form>
         ) : (
-          <form className="vp-form" onSubmit={requestCode} onChange={() => setError("")}>
+          <form key="request" id="request-reset-form" method="post" className="vp-form" onSubmit={requestCode} onChange={() => setError("")}>
             <label className="vp-field" htmlFor="reset-email">注册邮箱
-              <input id="reset-email" type="email" autoComplete="email" value={email}
-                onChange={event => setEmail(event.target.value)} readOnly={signedIn} required />
+              <input id="reset-email" name="email" type="email" autoComplete="username" spellCheck={false}
+                defaultValue={email} onChange={event => setEmail(event.target.value)} readOnly={signedIn} required />
             </label>
             <p className="vp-meta">若这个邮箱已有 VPrint 账号，验证码将发送到该邮箱。</p>
             {error && <p className="vp-error" role="alert">{error}</p>}

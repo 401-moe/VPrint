@@ -16,6 +16,12 @@ interface Member {
 
 type Mode = "signin" | "signup" | "otp";
 
+const authActions = {
+  signin: { path: "/api/auth/sign-in/email", error: "登录失败，请检查邮箱和密码。" },
+  signup: { path: "/api/auth/sign-up/email", error: "注册失败，请检查填写内容。" },
+  otp: { path: "/api/auth/sign-in/email-otp", error: "登录失败，请检查验证码。" },
+};
+
 const githubPath = "/github/choice";
 const githubBinding = location.pathname === githubPath && new URLSearchParams(location.search).has("bind");
 const otpFallback = location.pathname === "/login" && new URLSearchParams(location.search).get("method") === "otp";
@@ -29,14 +35,26 @@ function loginDestination() {
   return target.origin === location.origin && !["/", "/login"].includes(target.pathname) ? target.pathname + target.search : "/workspace";
 }
 
-const initialForm = { email: "", password: "", name: "" };
+function SignupPassword() {
+  const [visible, setVisible] = useState(false);
+  return <div className="vp-field">
+    <div className="identity-field-heading">
+      <label htmlFor="signup-new-password">设置密码</label>
+      <button type="button" className="password-recovery-link" aria-pressed={visible}
+        aria-controls="signup-new-password" onClick={() => setVisible(!visible)}>显示密码</button>
+    </div>
+    <input id="signup-new-password" name="password" type={visible ? "text" : "password"}
+      autoComplete="new-password" minLength={8} maxLength={128} required aria-describedby="signup-password-hint" />
+    <span id="signup-password-hint" className="vp-meta">8–128 个字符</span>
+  </div>;
+}
 
 export function App() {
   const [member, setMember] = useState<Member | null>(null);
   const [sessionState, setSessionState] = useState<"loading" | "ready" | "failed">("loading");
-  const [form, setForm] = useState(initialForm);
+  const [email, setEmail] = useState("");
+  const [signupName, setSignupName] = useState("");
   const [mode, setMode] = useState<Mode>(otpFallback ? "otp" : "signin");
-  const [otp, setOtp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [returnTo, setReturnTo] = useState<string>(loginDestination);
@@ -69,7 +87,6 @@ export function App() {
   useEffect(() => {
     const syncPath = () => {
       const reset = location.pathname === "/login" && new URLSearchParams(location.search).get("mode") === "reset";
-      if (reset) setForm(previous => ({ ...previous, password: "" }));
       setShowPasswordReset(reset);
     };
     window.addEventListener("popstate", syncPath);
@@ -78,29 +95,27 @@ export function App() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (mode === "otp") {
-      await signInWithOtp();
-      return;
-    }
-
+    if (pending) return;
+    const form = event.currentTarget;
+    const fields = new FormData(form);
+    const email = fields.get("email");
+    const credentials = mode === "otp" ? { email, otp: fields.get("otp") } : { email, password: fields.get("password") };
+    const body = mode === "signup" ? { ...credentials, name: fields.get("name") } : credentials;
     setPending(true);
     setError(null);
-
     try {
-      const body = await api<{ user: Member }>(
-        mode === "signup" ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email",
-        {
-          method: "POST",
-          body: JSON.stringify(mode === "signup" ? form : { email: form.email, password: form.password }),
-        },
-        mode === "signup" ? "注册失败，请检查填写内容。" : "登录失败，请检查邮箱和密码。",
-      );
+      const result = await api<{ user: Member }>(authActions[mode].path, {
+        method: "POST", headers: mode === "otp" ? otpHeaders : undefined, body: JSON.stringify(body),
+      }, authActions[mode].error);
       restoreLocation();
-      setForm(initialForm);
-      setMember(body.user);
+      setEmail("");
+      setSignupName("");
+      setSentTo("");
+      setMember(result.user);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "网络异常，请稍后重试。");
-      passwordInput.current?.focus();
+      const retryField = form.elements.namedItem(mode === "otp" ? "otp" : "password");
+      if (retryField instanceof HTMLInputElement) retryField.focus();
     } finally {
       setPending(false);
     }
@@ -111,6 +126,8 @@ export function App() {
 
   async function requestOtp() {
     if (!emailInput.current?.reportValidity()) return;
+    const address = emailInput.current.value;
+    setEmail(address);
     setPending(true);
     setError(null);
 
@@ -118,9 +135,9 @@ export function App() {
       await api("/api/auth/email-otp/send-verification-otp", {
         method: "POST",
         headers: otpHeaders,
-        body: JSON.stringify({ email: form.email, type: "sign-in" }),
+        body: JSON.stringify({ email: address, type: "sign-in" }),
       }, "验证码发送失败，请稍后重试。");
-      setSentTo(form.email);
+      setSentTo(address);
       otpInput.current?.focus();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "网络异常，请稍后重试。");
@@ -130,33 +147,15 @@ export function App() {
   }
 
   function switchMode(nextMode: Mode) {
-    if (githubBinding && nextMode === "signup") return;
+    if (mode === nextMode || (githubBinding && nextMode === "signup")) return;
+    setEmail(emailInput.current?.value ?? "");
     setMode(nextMode);
     setError(null);
-    if (nextMode === "otp") emailInput.current?.focus();
-    else if (nextMode === "signin") passwordInput.current?.focus();
-  }
-
-  async function signInWithOtp() {
-    setPending(true);
-    setError(null);
-
-    try {
-      const body = await api<{ user: Member }>("/api/auth/sign-in/email-otp", {
-        method: "POST",
-        headers: otpHeaders,
-        body: JSON.stringify({ email: form.email, otp }),
-      }, "登录失败，请检查验证码。");
-      restoreLocation();
-      setForm(initialForm);
-      setOtp("");
-      setMember(body.user);
-    } catch (cause) {
-      otpInput.current?.focus();
-      setError(cause instanceof Error ? cause.message : "网络异常，请稍后重试。");
-    } finally {
-      setPending(false);
-    }
+    requestAnimationFrame(() => {
+      if (nextMode === "signup") document.getElementById("signup-name")?.focus();
+      else if (nextMode === "signin" && emailInput.current?.value) passwordInput.current?.focus();
+      else emailInput.current?.focus();
+    });
   }
 
   function restoreLocation() {
@@ -202,10 +201,10 @@ export function App() {
   if (showPasswordReset) {
     const firstPassword = new URLSearchParams(location.search).get("first") === "1";
     return <><Header /><div className="vp-standalone"><main className="vp-auth-main">
-      <PasswordReset initialEmail={member?.email || form.email} firstPassword={firstPassword && !!member}
+      <PasswordReset initialEmail={member?.email || email} firstPassword={firstPassword && !!member}
         signedIn={!!member} onReturn={(email, completed) => {
           if (member && !completed) { location.replace("/account"); return; }
-          setForm({ ...initialForm, email });
+          setEmail(email);
           setMember(null);
           setMode("signin");
           setError(null);
@@ -225,7 +224,7 @@ export function App() {
               <div className="identity-page">
                 <header className="vp-heading identity-heading">
                   <div>
-                    <h1>登录训练工作区</h1>
+                    <h1>{mode === "signup" ? "创建 VPrint 账号" : "登录训练工作区"}</h1>
                     <p>{githubBinding ? "验证已有账号后绑定这个 GitHub 身份。" : "登录后可查看本队比赛和打印件。"}</p>
                   </div>
                 </header>
@@ -233,7 +232,7 @@ export function App() {
                   <div className="identity-switch" role="group" aria-label="登录方式">
                     {(githubBinding ? ["signin", "otp"] as const : ["signin", "otp", "signup"] as const).map(nextMode => (
                       <Button key={nextMode} type="button" variant="outline" className="vp-secondary"
-                        aria-pressed={mode === nextMode} onClick={() => switchMode(nextMode)}>
+                        disabled={pending} aria-pressed={mode === nextMode} onClick={() => switchMode(nextMode)}>
                         {nextMode === "signin" ? "密码登录" : nextMode === "otp" ? "验证码登录" : "注册"}
                       </Button>
                     ))}
@@ -241,37 +240,36 @@ export function App() {
                   <h2 className="sr-only" id="login-panel-title">
                     {mode === "signup" ? "创建账号" : mode === "otp" ? "邮箱验证码登录" : "密码登录"}
                   </h2>
-                  <form className="vp-form" onSubmit={submit} onChange={() => setError(null)}>
+                  <form key={mode} id={`${mode}-form`} method="post" action={authActions[mode].path} aria-labelledby="login-panel-title" className="vp-form" onSubmit={submit} onChange={() => setError(null)}>
                     {mode === "signup" && (
-                      <label className="vp-field" htmlFor="login-name">姓名
-                        <input id="login-name" name="name" autoComplete="name" value={form.name}
-                          onChange={event => setForm({ ...form, name: event.target.value })} required />
+                      <label className="vp-field" htmlFor="signup-name">姓名
+                        <input id="signup-name" name="name" autoComplete="name" pattern={String.raw`.*\S.*`}
+                          title="姓名不能全为空白" defaultValue={signupName} onChange={event => setSignupName(event.target.value)} required />
                       </label>
                     )}
-                    <label className="vp-field" htmlFor="login-email">邮箱
-                      <input id="login-email" ref={emailInput} name="email" type="email" autoComplete="email"
-                        value={form.email} onChange={event => { setForm({ ...form, email: event.target.value }); setSentTo(""); }} required />
+                    <label className="vp-field" htmlFor={`${mode}-email`}>邮箱
+                      <input id={`${mode}-email`} ref={emailInput} name="email" type="email" autoComplete="username"
+                        spellCheck={false} defaultValue={email} onChange={event => { setEmail(event.target.value); setSentTo(""); }} required />
                     </label>
-                    {mode !== "otp" && (
+                    {mode === "signup" && <SignupPassword />}
+                    {mode === "signin" && (
                       <div className="vp-field">
                         <div className="identity-field-heading">
-                          <label htmlFor="login-password">{mode === "signup" ? "设置密码" : "密码"}</label>
-                          {mode === "signin" && !githubBinding && (
+                          <label htmlFor="signin-password">密码</label>
+                          {!githubBinding && (
                             <a className="password-recovery-link"
                               href={`/login?mode=reset&next=${encodeURIComponent(returnTo)}`}
                               onClick={event => {
                                 if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
                                 event.preventDefault();
                                 history.pushState(null, "", event.currentTarget.href);
+                                setEmail(emailInput.current?.value ?? "");
                                 setShowPasswordReset(true);
                               }}>忘记密码？</a>
                           )}
                         </div>
-                        <input id="login-password" name="password" type="password"
-                          ref={passwordInput}
-                          autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                          minLength={8} maxLength={128} placeholder="8–128 个字符" value={form.password}
-                          onChange={event => setForm({ ...form, password: event.target.value })} required />
+                        <input id="signin-password" name="password" type="password" ref={passwordInput}
+                          autoComplete="current-password" required />
                       </div>
                     )}
                     {mode === "otp" && (
@@ -279,14 +277,13 @@ export function App() {
                         <label htmlFor="login-otp">邮箱验证码</label>
                         <div className="otp-entry">
                           <input ref={otpInput} id="login-otp" name="otp" inputMode="numeric" autoComplete="one-time-code"
-                            pattern="[0-9]{6}" maxLength={6} value={otp}
-                            onChange={event => setOtp(event.target.value)} required />
+                            pattern="[0-9]{6}" maxLength={6} required />
                           <Button type="button" variant="outline" className="vp-secondary" disabled={pending}
                             onClick={() => void requestOtp()}>
-                            {sentTo === form.email && sentTo ? "重新发送" : "获取验证码"}
+                            {sentTo === email && sentTo ? "重新发送" : "获取验证码"}
                           </Button>
                         </div>
-                        {sentTo === form.email && sentTo && <p className="vp-meta" role="status">验证码已发送至 {sentTo}</p>}
+                        {sentTo === email && sentTo && <p className="vp-meta" role="status">验证码已发送至 {sentTo}</p>}
                       </div>
                     )}
                     {error && <p className="vp-error" role="alert">{error}</p>}

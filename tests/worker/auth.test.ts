@@ -130,6 +130,18 @@ test("a member can sign up, leave, sign in again, and keep the same account", as
   expect(restoredUser?.id).toBe(createdUser?.id);
 });
 
+test("email registration requires a nonblank name and preserves internal spaces", async () => {
+  const register = (name: string) => worker.fetch(request("/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: loopbackOrigin },
+    body: JSON.stringify({ ...member, email: "name-check@vprint.example", name }),
+  }), env);
+  expect((await register("　 ")).status).toBe(400);
+  const created = await register("　王 小明 ");
+  expect(created.status).toBe(200);
+  expect(await json(created)).toMatchObject({ user: { name: "王 小明" } });
+});
+
 test("the CLI can start device authorization with its host metadata", async () => {
   const response = await worker.fetch(
     request("/api/auth/device/code", {
