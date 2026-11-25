@@ -6,7 +6,7 @@ import { interactive, report } from "./terminal.ts";
 import * as oauth from "oauth4webapi";
 import { clearCredentials, readCredentials, readCredentialsIfPresent, withCredentialLock, writeCredentials, type Credentials } from "./state.ts";
 
-const base = new URL(process.env.VPRINT_URL || "https://vprint.401.moe");
+const base = new URL(process.env.VPRINT_URL || "https://vprint.ac");
 if (base.username || base.password || base.search || base.hash || base.pathname !== "/") throw new Error("VPRINT_URL 应为 VPrint 服务的源地址。");
 const local = base.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(base.hostname);
 if (base.protocol !== "https:" && !local) throw new Error("VPrint 需要 HTTPS。");

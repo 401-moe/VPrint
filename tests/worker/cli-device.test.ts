@@ -21,8 +21,8 @@ beforeAll(async () => {
 });
 
 test("a Preview issues device links on its own HTTPS host", async () => {
-  const bindings = { ...env, VPRINT_PREVIEW_DOMAIN: "vprint-pr.401.moe" };
-  const origin = "https://test-branch.vprint-pr.401.moe";
+  const bindings = { ...env, VPRINT_PREVIEW_DOMAIN: "pr.vprint.ac" };
+  const origin = "https://test-branch.pr.vprint.ac";
   const response = await worker.fetch(new Request(origin + "/api/auth/device/code", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -36,7 +36,7 @@ test("a Preview issues device links on its own HTTPS host", async () => {
   expect(await response.json()).toMatchObject({ verification_uri: origin + "/device" });
   expect(bindings.BETTER_AUTH_URL).toBe(loopbackOrigin);
 
-  const wrongHost = await worker.fetch(new Request("https://vprint.401.moe/api/me"), bindings);
+  const wrongHost = await worker.fetch(new Request("https://vprint.ac/api/me"), bindings);
   expect(wrongHost.status).toBe(400);
 });
 

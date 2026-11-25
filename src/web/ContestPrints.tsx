@@ -105,7 +105,7 @@ export function PrintList({
         </div>
         <div className="contest-actions">
           <a className="back-file" href={returnHref}><ArrowLeft size={16} aria-hidden="true"/>返回工作台</a>
-          <a className="settings-action" href="https://github.com/401-moe/VPrint/releases">安装 CLI</a>
+          <a className="settings-action" href="https://github.com/vprint-ac/VPrint/releases">安装 CLI</a>
         </div>
       </header>
       <div className="file-workspace">

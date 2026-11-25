@@ -67,7 +67,7 @@ test("the print list shows languages, actions, and the latest print", async ({ p
     await expect(preview.locator(".proof-code code").first()).toHaveText(lines[0]);
   }
   await expect(page.getByRole("link", { name: "返回工作台" })).toHaveAttribute("href", "/");
-  await expect(page.getByRole("link", { name: "安装 CLI" })).toHaveAttribute("href", "https://github.com/401-moe/VPrint/releases");
+  await expect(page.getByRole("link", { name: "安装 CLI" })).toHaveAttribute("href", "https://github.com/vprint-ac/VPrint/releases");
 });
 
 test("mobile does not fetch the hidden latest-source preview", async ({ page }) => {

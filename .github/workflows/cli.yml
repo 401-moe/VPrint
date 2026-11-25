@@ -106,7 +106,7 @@ jobs:
 
           按终端提示在网页上批准登录。在比赛目录运行 `vprint use` 选择比赛，之后每次用 `vprint A.cpp` 打印。尚未加入 PATH 时，继续使用上面的相对路径运行命令。
 
-          [打开 VPrint](https://vprint.401.moe)
+          [打开 VPrint](https://vprint.ac)
           NOTES
           flags=()
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then flags+=(--prerelease); fi

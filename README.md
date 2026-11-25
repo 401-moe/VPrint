@@ -23,15 +23,15 @@ pnpm run dev
 
 ## 配置公开站点
 
-公开来源是 `https://vprint.401.moe`。Web 页面、CLI、邀请链接和设备码授权均使用这个来源。
+公开来源是 `https://vprint.ac`。Web 页面、CLI、邀请链接和设备码授权均使用这个来源。
 
-- **GitHub 网页登录**　在 GitHub 组织的 Developer settings → OAuth Apps 创建 OAuth App。Homepage URL 填 `https://vprint.401.moe`，Authorization callback URL 填 `https://vprint.401.moe/api/auth/callback/github`。GitHub 的 Enable Device Flow 保持关闭，CLI 的设备码由 VPrint 处理。把 Client ID 配在 Worker 的 `GITHUB_CLIENT_ID`，Client Secret 存入 Worker Secret `GITHUB_CLIENT_SECRET`。[GitHub 配置说明](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app)
-- **邮箱验证码**　发件地址为 `noreply@vprint.401.moe`。Worker 通过 `EMAIL` 绑定发信，Cloudflare Email Sending 管理该子域的发信验证记录。[Cloudflare 发信域说明](https://developers.cloudflare.com/email-service/configuration/subdomains/)
+- **GitHub 网页登录**　在 [vprint-ac 组织的 OAuth Apps](https://github.com/organizations/vprint-ac/settings/applications) 中配置 VPrint。Homepage URL 填 `https://vprint.ac`，Authorization callback URL 填 `https://vprint.ac/api/auth/callback/github`。GitHub 的 Enable Device Flow 保持关闭，CLI 的设备码由 VPrint 处理。把 Client ID 配在 Worker 的 `GITHUB_CLIENT_ID`，Client Secret 存入 Worker Secret `GITHUB_CLIENT_SECRET`。[GitHub 配置说明](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app)
+- **邮箱验证码**　在 Cloudflare Email Sending 中验证发信域名 `vprint.ac`。Worker 通过 `EMAIL` 绑定，以 `noreply@vprint.ac` 发送验证码。[Cloudflare 发信说明](https://developers.cloudflare.com/email-service/)
 - **站点会话**　在公开 Worker 上单独设置 `BETTER_AUTH_SECRET`。更换这个值会影响既有的认证凭证，应在计划轮换时操作。
 
 ## PR 预览
 
-Cloudflare Workers Builds 对功能分支运行 `npx wrangler preview`。从 PR 的 Cloudflare 检查打开预览链接，使用测试邮箱和密码注册。预览域名为 `<分支标识>.vprint-pr.401.moe`，设备授权和队伍邀请链接留在当前预览。GitHub 登录和验证码发信仅在生产站配置。
+Cloudflare Workers Builds 对功能分支运行 `npx wrangler preview`。从 PR 的 Cloudflare 检查打开预览链接，使用测试邮箱和密码注册。预览域名为 `<分支标识>.pr.vprint.ac`，设备授权和队伍邀请链接留在当前预览。GitHub 登录和验证码发信仅在生产站配置。
 
 各 PR 共用测试数据库 `vprint-pr-previews`，每个预览有自己的通知 Durable Object 命名空间。会话密钥通过 `wrangler preview base-config secret put BETTER_AUTH_SECRET` 单独设置。新增数据库迁移时，先在预览库运行：
 

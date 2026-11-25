@@ -2,8 +2,8 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "vprint-preview",
   "routes": [
-    { "pattern": "vprint.401.moe", "custom_domain": true },
-    { "pattern": "vprint-pr.401.moe", "custom_domain": true, "enabled": false, "previews_enabled": true }
+    { "pattern": "vprint.ac", "custom_domain": true },
+    { "pattern": "pr.vprint.ac", "custom_domain": true, "enabled": false, "previews_enabled": true }
   ],
   "workers_dev": false,
   "preview_urls": false,
@@ -29,18 +29,18 @@
     }
   ],
   "vars": {
-    "BETTER_AUTH_URL": "https://vprint.401.moe"
+    "BETTER_AUTH_URL": "https://vprint.ac"
   },
   "send_email": [
     {
       "name": "EMAIL",
-      "allowed_sender_addresses": ["noreply@vprint.401.moe"]
+      "allowed_sender_addresses": ["noreply@vprint.ac"]
     }
   ],
   "durable_objects": { "bindings": [{ "name": "NOTIFICATIONS", "class_name": "UserNotifications" }] },
   "migrations": [{ "tag": "notifications-v1", "new_sqlite_classes": ["UserNotifications"] }],
   "previews": {
-    "vars": { "VPRINT_PREVIEW_DOMAIN": "vprint-pr.401.moe" },
+    "vars": { "VPRINT_PREVIEW_DOMAIN": "pr.vprint.ac" },
     "d1_databases": [{
       "binding": "DB",
       "database_name": "vprint-pr-previews",
