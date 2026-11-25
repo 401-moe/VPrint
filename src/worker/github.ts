@@ -18,7 +18,7 @@ interface Pending {
 
 function localPath(value: string, origin: string) {
   const url = URL.parse(value, origin);
-  if (!url || url.origin !== origin || url.pathname.startsWith("//")) return "/";
+  if (!url || url.origin !== origin || url.pathname.startsWith("//")) return "/workspace";
   return url.pathname + url.search;
 }
 
@@ -50,7 +50,7 @@ export function githubSignIn(env: AuthEnvironment): BetterAuthPlugin {
     id: "vprint-github",
     endpoints: {
       githubStart: createAuthEndpoint("/github/start", {
-        method: "POST", body: z.object({ callbackURL: z.string().max(2048).default("/") }),
+        method: "POST", body: z.object({ callbackURL: z.string().max(2048).default("/workspace") }),
       }, async ctx => {
         ctx.body.callbackURL = origin + localPath(ctx.body.callbackURL, origin);
         const client = provider();

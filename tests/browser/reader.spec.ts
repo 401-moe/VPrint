@@ -66,7 +66,7 @@ test("the print list shows languages, actions, and the latest print", async ({ p
     await expect(preview.getByRole("link", { name: "阅读全文" })).toHaveAttribute("href", `/contest/${contestId}/print/${printId}`);
     await expect(preview.locator(".proof-code code").first()).toHaveText(lines[0]);
   }
-  await expect(page.getByRole("link", { name: "返回工作台" })).toHaveAttribute("href", "/");
+  await expect(page.getByRole("link", { name: "返回工作台" })).toHaveAttribute("href", "/workspace");
   await expect(page.getByRole("link", { name: "安装 CLI" })).toHaveAttribute("href", "https://github.com/vprint-ac/VPrint/releases");
 });
 

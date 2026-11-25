@@ -79,7 +79,7 @@ export function DevicePage({ email }: { email: string }) {
             {result === "approved" ? <Check aria-hidden="true" /> : <X aria-hidden="true" />}
             <strong>{device?.hostname}</strong>
             <p>{result === "approved" ? `CLI 会话有效期为 ${remember ? "30 天" : "8 小时"}。` : "此主机未获得访问权限。"}</p>
-            <a className="vp-text-action" href={result === "approved" ? "/account" : "/"}>
+            <a className="vp-text-action" href={result === "approved" ? "/account" : "/workspace"}>
               {result === "approved" ? "查看已登录会话" : "返回工作台"}
               <ChevronRight size={14} aria-hidden="true" />
             </a>

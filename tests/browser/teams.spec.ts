@@ -28,7 +28,7 @@ async function signOut(page: Page) {
 }
 
 test("an owner creates a team and contests, then a teammate explicitly joins by invitation", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/login");
   await register(page, "浏览器建队者");
   await page.getByRole("button", { name: "新建队伍" }).click();
   await createTeam(page, "火苗");
@@ -56,7 +56,7 @@ test("an owner creates a team and contests, then a teammate explicitly joins by 
 });
 
 test("a multi-team user returns from a deep link to its team and an outsider sees denial", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/login");
   await register(page, "多队队员");
   await page.getByRole("button", { name: "新建队伍" }).click();
   await createTeam(page, "第一队");
