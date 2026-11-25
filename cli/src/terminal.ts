@@ -5,6 +5,11 @@ import { log, S_INFO } from "@clack/prompts";
 
 export const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY && !process.env.CI);
 
+export function terminalLabel(value: string) {
+  return value.replace(/[\p{Cc}\p{Bidi_Control}\u2028\u2029]/gu,
+    char => "\\u" + char.charCodeAt(0).toString(16).padStart(4, "0"));
+}
+
 export function confirmPrint(input: Readable = process.stdin, output: Writable = process.stdout) {
   const prompt = new SelectKeyPrompt({
     input, output,

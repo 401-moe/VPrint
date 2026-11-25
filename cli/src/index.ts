@@ -21,10 +21,10 @@ const cli = new Command("vprint")
   .helpCommand(false)
   .enablePositionalOptions()
   .option("-y, --yes", "显示打印信息后直接打印")
-  .allowExcessArguments()
-  .argument("[文件]", "要打印的一个 UTF-8 文本文件")
-  .action(async (file: string | undefined, options: { yes?: boolean }) => {
-    if (cli.args.length > 1) throw new Error("每次只能打印一个文件，请分别运行 vprint。");
+  .argument("[文件...]", "要打印的一个 UTF-8 文本文件")
+  .action(async (files: string[], options: { yes?: boolean }) => {
+    if (files.length > 1) throw new Error("每次只能打印一个文件，请分别运行 vprint。");
+    const [file] = files;
     if (file !== undefined) await printFile(file, Boolean(options.yes));
     else if (process.argv.length > 2) throw new Error("请指定要打印的文件。");
     else cli.outputHelp();

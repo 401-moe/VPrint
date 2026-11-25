@@ -3,7 +3,7 @@ import { isCancel, select } from "@clack/prompts";
 import { apiRequest } from "./auth.ts";
 import { bindDirectory, findContest, uuidPattern } from "./binding.ts";
 import { readPrintFile } from "./print-files.ts";
-import { confirmPrint, errorMessage, interactive, report } from "./terminal.ts";
+import { confirmPrint, errorMessage, interactive, report, terminalLabel } from "./terminal.ts";
 
 interface Choice { id: string; name: string; createdAt?: number }
 interface UseOptions { team?: string; contest?: string }
@@ -25,7 +25,8 @@ export function formatFileAge(ageMs: number) {
 }
 
 function describe(item: Choice) {
-  return item.createdAt === undefined ? item.name : item.name + "  " + localTime(item.createdAt);
+  const name = terminalLabel(item.name);
+  return item.createdAt === undefined ? name : name + "  " + localTime(item.createdAt);
 }
 
 async function choose(kind: "队伍" | "比赛", items: Choice[], selector: string | undefined) {
@@ -33,11 +34,11 @@ async function choose(kind: "队伍" | "比赛", items: Choice[], selector: stri
     items = uuidPattern.test(selector)
       ? items.filter(item => item.id.toLowerCase() === selector.toLowerCase())
       : items.filter(item => item.name === selector);
-    if (!items.length) throw new Error(`找不到${kind}「${selector}」，请核对名称或 ID。`);
+    if (!items.length) throw new Error(`找不到${kind}「${terminalLabel(selector)}」，请核对名称或 ID。`);
     if (items.length === 1) return items[0];
     if (!interactive) {
       const matches = items.map(item => `  ${describe(item)}  ${item.id}`).join("\n");
-      throw new Error(`${kind}「${selector}」有重名，请改用 ID：\n${matches}`);
+      throw new Error(`${kind}「${terminalLabel(selector)}」有重名，请改用 ID：\n${matches}`);
     }
   } else if (kind === "队伍" && items.length === 1) {
     return items[0];
@@ -68,23 +69,24 @@ export async function useContest(options: UseOptions) {
   if (!contests.length) throw new Error("请先在 Web 为该队创建比赛。");
   const contest = await choose("比赛", contests, options.contest);
   await bindDirectory(contest.id);
-  report("success", "已绑定 " + team.name + " / " + contest.name);
+  report("success", "已绑定 " + terminalLabel(team.name) + " / " + terminalLabel(contest.name));
 }
 
 async function submitFile(endpoint: string, { bytes, filename }: Awaited<ReturnType<typeof readPrintFile>>) {
+  const displayName = terminalLabel(filename);
   const headers = new Headers({
     "content-type": "application/octet-stream",
     "idempotency-key": randomUUID(),
     "x-vprint-filename": encodeURIComponent(filename),
   });
   for (let attempt = 1; ; attempt++) {
-    if (interactive && attempt > 1) report("info", `${filename} 尚未收到成功回执，正在重试（${attempt}/3）。`);
+    if (interactive && attempt > 1) report("info", `${displayName} 尚未收到成功回执，正在重试（${attempt}/3）。`);
     let response: Response;
     try {
       response = await apiRequest(endpoint, "POST", headers, bytes);
       if (response.ok) {
         const receipt = await response.json() as { createdAt: number };
-        report("success", filename + " 已打印  " + localTime(receipt.createdAt));
+        report("success", displayName + " 已打印  " + localTime(receipt.createdAt));
         return;
       }
     } catch (error) {
@@ -102,7 +104,7 @@ export async function printFile(path: string, yes: boolean) {
   const contestId = await findContest();
   const file = await readPrintFile(path).catch(error => {
     const reason = (error as NodeJS.ErrnoException).code === "ENOENT" ? "找不到文件。" : errorMessage(error);
-    throw new Error(path + " 打印失败：" + reason);
+    throw new Error(terminalLabel(path) + " 打印失败：" + terminalLabel(reason));
   });
   const endpoint = "/api/cli/contests/" + contestId;
   const response = await apiRequest(endpoint);
@@ -111,9 +113,9 @@ export async function printFile(path: string, yes: boolean) {
   const contest = await response.json() as { teamName: string; name: string; createdAt: number };
   const now = Date.now();
   report("info", [
-    `当前比赛　${contest.teamName} / ${contest.name}（创建于 ${localTime(contest.createdAt)}）`,
+    `当前比赛　${terminalLabel(contest.teamName)} / ${terminalLabel(contest.name)}（创建于 ${localTime(contest.createdAt)}）`,
     "当前时间　" + localTime(now),
-    "文件名　　" + file.filename,
+    "文件名　　" + terminalLabel(file.filename),
     "文件大小　" + file.bytes.byteLength + " 字节",
     `上次修改　${localTime(file.mtime)}（${formatFileAge(now - file.mtime.getTime())}）`,
   ].join("\n"));

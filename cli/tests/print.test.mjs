@@ -128,6 +128,11 @@ test("select a team and contest, restart under that directory, and print exact b
   }
   assert.match(await invoke(["use", "--team", "晚班", "--contest", "决赛"], practice), /已绑定 晚班 \/ 决赛/);
   assert.deepEqual(JSON.parse(await readFile(join(practice, ".vprint"), "utf8")), { contestId: innerId });
+  const requestsBeforeExtraArgs = received.length;
+  for (const command of ["login", "logout", "use"]) {
+    assert.match(await invoke([command, "extra"], practice, 1), /too many arguments/);
+  }
+  assert.equal(received.length, requestsBeforeExtraArgs);
   const source = Buffer.from("\uFEFF\t解题\r\n", "utf8");
   await writeFile(join(subdir, "笔记"), source);
   const stamp = new Date(2026, 2, 4, 15, 6, 7);
@@ -153,6 +158,11 @@ test("select a team and contest, restart under that directory, and print exact b
   assert.equal(lost.headers["idempotency-key"], retried.headers["idempotency-key"]);
   assert.notEqual(lost.headers.dpop, retried.headers.dpop);
   assert.notEqual(manual.headers["idempotency-key"], lost.headers["idempotency-key"]);
+  contests[0].name = "决赛\n下午场";
+  const escapedName = "决赛\\u000a下午场";
+  assert.ok((await invoke(["use", "--team", innerId, "--contest", contests[0].name], practice)).includes(escapedName));
+  assert.ok((await invoke(["-y", "笔记"], subdir)).includes("当前比赛　晚班 / " + escapedName));
+  contests[0].name = "决赛";
   for (const literal of ["login", "-y"]) {
     await writeFile(join(subdir, literal), source);
     await invoke(["-y", "--", literal], subdir);
