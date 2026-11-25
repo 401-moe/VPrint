@@ -115,7 +115,7 @@ CLI 通过绑定的比赛 ID 读取队名、比赛名和比赛创建时间。终
 
 部署平台优先使用 Cloudflare Workers。首版建议用 Worker、静态资源和 D1 提供应用，并用支持休眠的 Durable Object 承载浏览器共享的 WebSocket。
 
-对外域名为 `https://vprint.401.moe`。Web、API、CLI 默认服务地址、设备验证网址和邀请链接使用同一来源。GitHub OAuth App 的 Homepage URL 使用站点根地址，Authorization callback URL 使用 `https://vprint.401.moe/api/auth/callback/github`。
+对外域名为 `https://vprint.ac`。Web、API、CLI 默认服务地址、设备验证网址和邀请链接使用同一来源。GitHub OAuth App 的 Homepage URL 使用站点根地址，Authorization callback URL 使用 `https://vprint.ac/api/auth/callback/github`。
 
 | 部分 | 建议 | 对应的产品行为 |
 | --- | --- | --- |

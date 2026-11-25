@@ -185,7 +185,7 @@ test("a member can sign in with an email OTP and cannot reuse the OTP", async ()
   );
   expect(requestOtp.status).toBe(200);
   expect(sentEmails.at(-1)?.to).toBe(email);
-  expect(sentEmails.at(-1)?.from).toBe("noreply@vprint.401.moe");
+  expect(sentEmails.at(-1)?.from).toBe("noreply@vprint.ac");
   const otp = sentEmails.at(-1)?.text.match(/\b\d{6}\b/)?.[0];
   expect(otp).toBeDefined();
 

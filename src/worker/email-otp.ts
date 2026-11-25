@@ -2,7 +2,7 @@ import { emailOTP } from "better-auth/plugins/email-otp";
 import { APIError } from "better-auth/api";
 import type { AuthEnvironment } from "./auth";
 
-const otpSender = "noreply@vprint.401.moe";
+const otpSender = "noreply@vprint.ac";
 
 export function createEmailOtpPlugin(env: AuthEnvironment, existingAccountOnly = false) {
   return emailOTP({

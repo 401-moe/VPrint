@@ -4,7 +4,7 @@
 
 ### Issue tracker
 
-在 [VPrint GitHub Issues](https://github.com/401-moe/VPrint/issues) 跟踪规格和工单。发布及依赖关系见[工单约定](docs/agents/issue-tracker.md)。
+在 [VPrint GitHub Issues](https://github.com/vprint-ac/VPrint/issues) 跟踪规格和工单。发布及依赖关系见[工单约定](docs/agents/issue-tracker.md)。
 
 ### Triage labels
 
