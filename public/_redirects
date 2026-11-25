@@ -1,0 +1,7 @@
+/login          /workspace 200
+/device         /workspace 200
+/github/choice  /workspace 200
+/account        /workspace 200
+/team           /workspace 200
+/invite/*       /workspace 200
+/contest/*      /workspace 200

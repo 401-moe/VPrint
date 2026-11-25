@@ -94,7 +94,7 @@ export function AccountSettings({ email, name }: { email: string; name?: string 
         .catch(cause => {
           if (!(cause instanceof ApiError && cause.status === 404)) throw cause;
         });
-      if (session.current) window.location.replace("/");
+      if (session.current) window.location.replace("/login");
       else await reload();
     } catch { setError("退出会话失败。"); }
     finally { setBusy(""); }

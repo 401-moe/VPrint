@@ -17,7 +17,7 @@ async function createTeam(page: Page, teamName: string) {
 }
 
 test("owners preview, confirm, and reset invitation changes", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/login");
   await register(page, "甲");
   await createTeam(page, "邀请管理");
   await page.getByRole("link", { name: "队伍设置" }).click();
@@ -40,7 +40,7 @@ test("members use the invitation page and the owner manages membership with conf
   browser,
   baseURL,
 }) => {
-  await page.goto("/");
+  await page.goto("/login");
   await register(page, "甲");
   await createTeam(page, "确认管理");
   await page.getByRole("link", { name: "队伍设置" }).click();
@@ -95,7 +95,7 @@ test("members use the invitation page and the owner manages membership with conf
 });
 
 test("contest deletion uses the row-end menu and both confirmation paths work", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/login");
   await register(page, "队长");
   await createTeam(page, "比赛删除");
   await page.getByRole("button", { name: "新建比赛" }).click();

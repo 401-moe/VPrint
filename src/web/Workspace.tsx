@@ -83,7 +83,7 @@ export function Workspace({ member, pending, error, signOut }: {
     setSwitching(true); setActionError("");
     try {
       await persistSelection(id);
-      if (destination || contestId) navigate(destination ?? "/");
+      if (destination || contestId) navigate(destination ?? "/workspace");
     } catch { setActionError("切换队伍失败，请重试。"); }
     finally { setSwitching(false); }
   }
@@ -93,7 +93,7 @@ export function Workspace({ member, pending, error, signOut }: {
     if (!anchor || anchor.target || anchor.hasAttribute("download")) return;
     const url = new URL(anchor.href);
     if (url.origin !== location.origin || url.hash || url.search ||
-        !(/^\/contest\/[\w-]+(?:\/print\/[\w-]+)?$/.test(url.pathname) || ["/", "/team", "/account"].includes(url.pathname))) return;
+        !(/^\/contest\/[\w-]+(?:\/print\/[\w-]+)?$/.test(url.pathname) || ["/workspace", "/team", "/account"].includes(url.pathname))) return;
     event.preventDefault();
     const nextPrint = /^\/contest\/([\w-]+)\/print\/([\w-]+)$/.exec(url.pathname);
     if (nextPrint) {
@@ -102,7 +102,7 @@ export function Workspace({ member, pending, error, signOut }: {
     } else if (!printId || url.pathname !== `/contest/${contestId}`) {
       returnState.current = null;
     }
-    if (contestId && url.pathname === "/" && team) void select(team.id, "/");
+    if (contestId && url.pathname === "/workspace" && team) void select(team.id, "/workspace");
     else navigate(url.pathname);
   }
   async function join(teamId: string) {
@@ -111,13 +111,13 @@ export function Workspace({ member, pending, error, signOut }: {
       return;
     }
     await persistSelection(teamId);
-    if (location.pathname === path) navigate("/");
+    if (location.pathname === path) navigate("/workspace");
   }
   async function createTeam(name: string) {
     const created = await api<Team>("/api/teams", { method: "POST", body: JSON.stringify({ name }) });
     try {
       await persistSelection(created.id);
-      navigate("/");
+      navigate("/workspace");
     } catch {
       refresh();
       setActionError("队伍已创建。请在顶部队伍菜单中选择新队伍。");
@@ -146,7 +146,7 @@ export function Workspace({ member, pending, error, signOut }: {
       <h1>{denied ? "无法访问比赛" : contestId ? "无法读取比赛" : "无法读取工作台"}</h1>
       <p className="vp-note">{denied ? "比赛可能已删除，或你尚未加入这支队伍。" : "请检查网络后重试。"}</p>
       <button className="vp-text-action" onClick={refresh}>重新加载</button>
-      {contestId && <a className="vp-text-action" href="/">返回工作台</a>}
+      {contestId && <a className="vp-text-action" href="/workspace">返回工作台</a>}
     </section>;
   }
 
@@ -154,7 +154,7 @@ export function Workspace({ member, pending, error, signOut }: {
     if (!data?.contest) return <main className="files-shell">{loading()}</main>;
     const props = { contestId, contestName: data.contest.name, createdAt: data.contest.createdAt, navigate: follow };
     if (printId) return <PrintPage key={printId} {...props} printId={printId} noticeId={noticeId}/>;
-    return <PrintList key={contestId} {...props} returnHref="/" version={listVersion} returnState={returnState.current?.contestId === contestId ? returnState.current : null}/>;
+    return <PrintList key={contestId} {...props} returnHref="/workspace" version={listVersion} returnState={returnState.current?.contestId === contestId ? returnState.current : null}/>;
   }
 
   function workspaceView() {

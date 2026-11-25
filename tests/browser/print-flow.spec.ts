@@ -9,6 +9,7 @@ test("a member authorizes a real CLI and reads its print on phones and desktops"
   baseURL,
 }) => {
   await page.goto("/");
+  await page.getByRole("link", { name: "进入训练工作区" }).click();
   await page.getByRole("button", { name: "注册", exact: true }).click();
   await page.getByLabel("姓名").fill("主机队员");
   await page.getByLabel("邮箱").fill(`print-flow-${crypto.randomUUID()}@vprint.example`);
@@ -52,6 +53,7 @@ test("a member authorizes a real CLI and reads its print on phones and desktops"
     await printCli(firstSource.filename);
 
     await page.goto("/");
+    await page.getByRole("link", { name: "进入训练工作区" }).click();
     await contest.click();
     const firstLink = page.getByRole("link", { name: /solver\.cpp/ });
     await expect(firstLink).toBeVisible();

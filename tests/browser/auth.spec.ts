@@ -34,7 +34,7 @@ async function memberId(page: Page) {
 }
 
 async function registration(page: Page, email: string) {
-  await page.goto("/");
+  await page.goto("/login");
   await button(page, "注册").click();
   await field(page, "姓名").fill("浏览器队员");
   await field(page, "邮箱").fill(email);
@@ -175,7 +175,7 @@ for (const firstPassword of [false, true]) {
   async ({ page, baseURL }) => {
     const email = address();
     if (firstPassword) {
-      await page.goto("/");
+      await page.goto("/login");
       await button(page, "验证码登录").click();
       await field(page, "邮箱").fill(email);
       await button(page, "获取验证码").click();

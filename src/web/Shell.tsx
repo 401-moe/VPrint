@@ -80,7 +80,7 @@ export function CreateTeamDialog({ dialog, create }: {
 }
 
 const destinations = [
-  { href: "/", label: "比赛工作台", icon: FolderOpen },
+  { href: "/workspace", label: "比赛工作台", icon: FolderOpen },
   { href: "/team", label: "队伍设置", icon: UsersRound },
   { href: "/account", label: "账号设置", icon: UserRound },
 ];

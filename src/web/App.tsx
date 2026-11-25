@@ -23,10 +23,10 @@ const otpFallback = location.pathname === "/login" && new URLSearchParams(locati
 function loginDestination() {
   if (location.pathname !== "/login") return location.pathname + location.search;
   const next = new URLSearchParams(location.search).get("next");
-  if (!next?.startsWith("/") || next.startsWith("//")) return "/";
+  if (!next?.startsWith("/") || next.startsWith("//")) return "/workspace";
   let target: URL;
-  try { target = new URL(next, location.origin); } catch { return "/"; }
-  return target.origin === location.origin && target.pathname !== "/login" ? target.pathname + target.search : "/";
+  try { target = new URL(next, location.origin); } catch { return "/workspace"; }
+  return target.origin === location.origin && !["/", "/login"].includes(target.pathname) ? target.pathname + target.search : "/workspace";
 }
 
 const initialForm = { email: "", password: "", name: "" };
@@ -166,7 +166,7 @@ export function App() {
     if (target.origin !== window.location.origin) return;
 
     window.history.replaceState(null, "", `${target.pathname}${target.search}`);
-    setReturnTo("/");
+    setReturnTo("/workspace");
   }
 
   async function signOut() {

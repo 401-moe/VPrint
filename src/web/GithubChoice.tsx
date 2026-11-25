@@ -67,7 +67,7 @@ export function GithubChoice({ member }: { member: { email: string } | null }) {
             </div>
           </> : <p className="vp-meta" role={error ? "alert" : "status"}>{error || "正在读取 GitHub 授权结果…"}</p>}
           {choice && error && <p className="vp-error" role="alert">{error}</p>}
-          {!choice && error && <a className="vp-text-action" href="/">返回登录</a>}
+          {!choice && error && <a className="vp-text-action" href="/login">返回登录</a>}
         </section>
       </div></main>
     </div>

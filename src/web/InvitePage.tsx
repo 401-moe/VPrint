@@ -104,7 +104,7 @@ export function InvitePage({
         </header>
         <section className="vp-panel teams-invalid-invite">
           <p className="vp-error">邀请不存在或已被重置。请向队伍队长索取新的邀请链接。</p>
-          <a className="teams-heading-action" href="/">
+          <a className="teams-heading-action" href="/workspace">
             返回工作台
             <ChevronRight size={15} aria-hidden="true" />
           </a>
