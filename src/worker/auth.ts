@@ -1,4 +1,5 @@
 import { betterAuth, type BetterAuthOptions } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { jwt } from "better-auth/plugins";
 import {
   oauthDeviceAuthorization,
@@ -46,6 +47,16 @@ function createAuthOptions(env: AuthEnvironment, { cliProtocol, existingAccountO
     emailAndPassword: {
       enabled: true,
       revokeSessionsOnPasswordReset: true,
+    },
+    hooks: {
+      before: createAuthMiddleware(async ctx => {
+        if (ctx.path !== "/sign-up/email") return;
+        const name = ctx.body?.name;
+        if (typeof name !== "string" || !name.trim()) {
+          throw new APIError("BAD_REQUEST", { message: "请输入姓名。" });
+        }
+        return { context: { body: { ...ctx.body, name: name.trim() } } };
+      }),
     },
     plugins: [
       createEmailOtpPlugin(env, existingAccountOnly),

@@ -63,6 +63,39 @@ async function signIn(page: Page, email: string, password: string) {
   await button(page, "登录").click();
 }
 
+test("registration isolates credentials and submits autofilled values without a change event", async ({ page }) => {
+  await page.goto("/login");
+  const email = address();
+  await field(page, "邮箱").fill(email);
+  await field(page, "密码").fill("only for sign-in");
+  const signInForm = page.locator("form").filter({ has: field(page, "密码") });
+  const oldForm = await signInForm.elementHandle();
+  await button(page, "注册").click();
+  expect(await oldForm!.evaluate(form => form.isConnected)).toBe(false);
+  const password = field(page, "设置密码");
+  await expect(password).toHaveValue("");
+  await expect(password).toHaveAttribute("autocomplete", "new-password");
+  await expect(field(page, "邮箱")).toHaveValue(email);
+  await expect(field(page, "邮箱")).toHaveAttribute("autocomplete", "username");
+  await expect(page.getByRole("form", { name: "创建账号" })).toHaveAttribute("method", "post");
+  await field(page, "姓名").fill("   ");
+  expect(await field(page, "姓名").evaluate((input: HTMLInputElement) => input.validity.patternMismatch)).toBe(true);
+  await field(page, "姓名").fill("浏览器队员");
+
+  // Some autofill tools write directly to the input without firing React's change event.
+  await password.evaluate((input: HTMLInputElement, value) => { input.value = value; }, originalPassword);
+  await button(page, "显示密码").click();
+  await expect(password).toHaveAttribute("type", "text");
+  await expect(password).toHaveValue(originalPassword);
+  await button(page, "显示密码").click();
+  await expect(password).toHaveAttribute("type", "password");
+  await button(page, "创建并进入").click();
+  await expect(heading(page, "比赛工作台")).toBeVisible();
+  await signOut(page);
+  await signIn(page, email, originalPassword);
+  await expect(heading(page, "账号设置")).toBeVisible();
+});
+
 test("a temporary session lookup failure keeps the requested account page recoverable", async ({ page }) => {
   await signUp(page, address());
   await page.route("**/api/me", route => route.fulfill({ status: 503, body: "" }));
@@ -145,6 +178,7 @@ test("changing a password requires the current password and preserves the active
   await signUp(page, email);
   await account(page);
   await button(page, "修改密码").click();
+  await expect(page.getByRole("dialog").locator('input[autocomplete="username"]')).toHaveValue(email);
   await expect(field(page, "当前密码")).toBeFocused();
   await field(page, "当前密码").fill("not the password");
   await field(page, "新密码").fill(newPassword);
@@ -196,6 +230,7 @@ for (const firstPassword of [false, true]) {
     await expect(field(page, "注册邮箱")).toHaveValue(email);
     await button(page, "获取重置验证码").click();
     const code = await receiveCode(baseURL!, email, "重置密码");
+    await expect(page.locator('#reset-password-form input[autocomplete="username"]')).toHaveValue(email);
     await field(page, "邮箱验证码").fill(code === "000000" ? "000001" : "000000");
     await field(page, "新密码").fill(newPassword);
     await field(page, "确认新密码").fill(newPassword);

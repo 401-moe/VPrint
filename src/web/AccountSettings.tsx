@@ -202,7 +202,8 @@ export function AccountSettings({ email, name }: { email: string; name?: string 
           setPasswordError("");
         }}>
         <h2 id="account-password-title">{settings.hasPassword ? "修改密码" : "设置密码"}</h2>
-        <form className="vp-form" onSubmit={savePassword} onChange={() => setPasswordError("")}>
+        <form id="change-password-form" method="post" className="vp-form" onSubmit={savePassword} onChange={() => setPasswordError("")}>
+          <input hidden readOnly type="email" id="change-username" name="username" autoComplete="username" value={email} />
           {settings.hasPassword && <label className="vp-field">当前密码
             <input type="password" name="currentPassword" autoComplete="current-password" required />
           </label>}
