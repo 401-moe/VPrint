@@ -1,7 +1,7 @@
 import { type FormEvent, useRef, useState } from "react";
 import { FileText, FolderOpen, Plus, Users } from "lucide-react";
 import { Button } from "./components/ui/button";
-import { ContestActions } from "./DeleteGroup";
+import { DeleteGroup } from "./DeleteGroup";
 import { api } from "./api";
 import type { Team } from "./Shell";
 
@@ -64,7 +64,7 @@ export function ContestWorkspace({ team, contests, refresh, createTeam }: {
             aria-label={`阅读最近打印的 ${contest.latestFilename}，${time.format(contest.latestPrintAt)}`}>
             <FileText size={14} aria-hidden="true"/><span>{contest.latestFilename}</span><time>{time.format(contest.latestPrintAt)}</time>
           </a> : <span className="teams-contest-latest">尚未打印</span>}
-          {team.role === "owner" && <ContestActions id={contest.id} name={contest.name} onDeleted={refresh}/>}
+          {team.role === "owner" && <DeleteGroup kind="contest" id={contest.id} name={contest.name} onDeleted={refresh}/>}
         </li>;
       })}</ul>
     </div> : <div className="vp-panel teams-empty">

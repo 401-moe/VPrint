@@ -105,7 +105,14 @@ export function Workspace({ member, pending, error, signOut }: {
     if (contestId && url.pathname === "/" && team) void select(team.id, "/");
     else navigate(url.pathname);
   }
-  async function join(teamId: string) { await persistSelection(teamId); navigate("/"); }
+  async function join(teamId: string) {
+    if (location.pathname !== path) {
+      refresh();
+      return;
+    }
+    await persistSelection(teamId);
+    if (location.pathname === path) navigate("/");
+  }
   async function createTeam(name: string) {
     const created = await api<Team>("/api/teams", { method: "POST", body: JSON.stringify({ name }) });
     try {

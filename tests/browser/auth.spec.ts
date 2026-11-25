@@ -63,6 +63,30 @@ async function signIn(page: Page, email: string, password: string) {
   await button(page, "登录").click();
 }
 
+test("a temporary session lookup failure keeps the requested account page recoverable", async ({ page }) => {
+  await signUp(page, address());
+  await page.route("**/api/me", route => route.fulfill({ status: 503, body: "" }));
+  await page.goto("/account");
+  await expect(heading(page, "无法读取登录状态")).toBeVisible();
+  await expect(field(page, "密码")).toHaveCount(0);
+  await page.unroute("**/api/me");
+  await button(page, "重新加载").click();
+  await expect(heading(page, "账号设置")).toBeVisible();
+});
+
+test("a signed-in login link restores its destination and account settings can retry", async ({ page }) => {
+  await signUp(page, address());
+  await page.route("**/api/account/sessions", route => route.fulfill({ status: 503, body: "" }));
+  await page.goto("/login?next=%2Faccount");
+  await expect(page).toHaveURL(/\/account$/);
+  await expect(page.getByRole("alert")).toContainText("读取账号设置失败");
+  await expect(button(page, "关联 GitHub")).toHaveCount(0);
+  await page.unroute("**/api/account/sessions");
+  await button(page, "重新加载").click();
+  await expect(button(page, "修改密码")).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
 test("password login preserves the member after reload and recovers from a mistyped password", async ({ page }) => {
   const email = address();
   await signUp(page, email);

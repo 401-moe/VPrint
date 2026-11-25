@@ -6,7 +6,7 @@ import { PasswordReset } from "./Passwords";
 import { Header } from "./Shell";
 import { Button } from "./components/ui/button";
 import { Workspace } from "./Workspace";
-import { api } from "./api";
+import { api, ApiError } from "./api";
 
 interface Member {
   id: string;
@@ -24,7 +24,8 @@ function loginDestination() {
   if (location.pathname !== "/login") return location.pathname + location.search;
   const next = new URLSearchParams(location.search).get("next");
   if (!next?.startsWith("/") || next.startsWith("//")) return "/";
-  const target = new URL(next, location.origin);
+  let target: URL;
+  try { target = new URL(next, location.origin); } catch { return "/"; }
   return target.origin === location.origin && target.pathname !== "/login" ? target.pathname + target.search : "/";
 }
 
@@ -32,7 +33,7 @@ const initialForm = { email: "", password: "", name: "" };
 
 export function App() {
   const [member, setMember] = useState<Member | null>(null);
-  const [memberChecked, setMemberChecked] = useState(false);
+  const [sessionState, setSessionState] = useState<"loading" | "ready" | "failed">("loading");
   const [form, setForm] = useState(initialForm);
   const [mode, setMode] = useState<Mode>(otpFallback ? "otp" : "signin");
   const [otp, setOtp] = useState("");
@@ -47,20 +48,22 @@ export function App() {
     location.pathname === "/login" && new URLSearchParams(location.search).get("mode") === "reset",
   );
   useEffect(() => {
-    let active = true;
-
-    api<Member | null>("/api/me", undefined, "读取登录状态失败。")
-      .catch(() => null)
-      .then((value) => {
-        if (active) setMember(value);
+    const controller = new AbortController();
+    api<Member>("/api/me", { signal: controller.signal })
+      .then(value => {
+        if (controller.signal.aborted) return;
+        if (value && location.pathname === "/login" && new URLSearchParams(location.search).get("mode") !== "reset") {
+          history.replaceState(null, "", loginDestination());
+        }
+        setMember(value);
+        setSessionState("ready");
       })
-      .finally(() => {
-        if (active) setMemberChecked(true);
+      .catch(cause => {
+        if (!controller.signal.aborted) {
+          setSessionState(cause instanceof ApiError && cause.status === 401 ? "ready" : "failed");
+        }
       });
-
-    return () => {
-      active = false;
-    };
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -182,7 +185,17 @@ export function App() {
     }
   }
 
-  if (!memberChecked) return <Header />;
+  if (sessionState === "loading") return <Header />;
+  if (sessionState === "failed") return <>
+    <Header />
+    <main className="vp-auth-main">
+      <section className="unavailable">
+        <h1>无法读取登录状态</h1>
+        <p className="vp-note">请检查网络后重试。</p>
+        <Button variant="outline" onClick={() => location.reload()}>重新加载</Button>
+      </section>
+    </main>
+  </>;
 
   if (location.pathname === githubPath && (!githubBinding || member)) return <GithubChoice member={member} />;
 

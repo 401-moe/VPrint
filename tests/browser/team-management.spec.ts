@@ -53,8 +53,20 @@ test("members use the invitation page and the owner manages membership with conf
     await member.goto(invitation);
     await register(member, "乙");
     await expect(member.getByRole("heading", { name: "确认管理" })).toBeVisible();
-    await member.getByRole("button", { name: "加入队伍" }).click();
-    await member.getByRole("link", { name: "队伍设置" }).click();
+    // Navigate while the real join response is in flight.
+    let releaseJoin!: () => void;
+    const navigationFinished = new Promise<void>(resolve => { releaseJoin = resolve; });
+    await member.route("**/api/team-invitations/*/join", async route => {
+      await navigationFinished;
+      await route.continue();
+    }, { times: 1 });
+    try {
+      await member.getByRole("button", { name: "加入队伍" }).click();
+      await member.getByRole("link", { name: "队伍设置" }).click();
+      await expect(member.getByRole("heading", { name: "队伍设置" })).toBeVisible();
+    } finally {
+      releaseJoin();
+    }
     await member.getByRole("button", { name: "退出队伍" }).click();
     await member.getByRole("dialog", { name: "退出队伍" }).getByRole("button", { name: "确认" }).click();
     await expect(member.getByText("请先创建队伍或通过邀请链接加入。")).toBeVisible();

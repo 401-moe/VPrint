@@ -36,7 +36,7 @@ const plainText = { name: "纯文本", grammar: "" };
 
 function language(filename: string) {
   const extension = /\.([a-z0-9]+)$/i.exec(filename)?.[1].toLowerCase();
-  return extension ? languages[extension] ?? plainText : plainText;
+  return extension && Object.hasOwn(languages, extension) ? languages[extension] : plainText;
 }
 
 export function languageForFilename(filename: string) {
