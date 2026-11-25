@@ -31,7 +31,7 @@ pnpm run dev
 
 ## PR 预览
 
-Cloudflare Workers Builds 对功能分支运行 `npx wrangler preview`。从 PR 的 Cloudflare 检查打开预览链接，使用测试邮箱和密码注册。预览域名为 `<分支标识>.pr.vprint.ac`，设备授权和队伍邀请链接留在当前预览。GitHub 登录和验证码发信仅在生产站配置。
+Cloudflare Workers Builds 对功能分支运行 `npx wrangler preview`。从 PR 的 Cloudflare 检查打开预览链接，使用测试邮箱和密码注册。预览域名为 `<分支标识>.vprint.ac`，设备授权和队伍邀请链接留在当前预览。GitHub 登录和验证码发信仅在生产站配置。
 
 各 PR 共用测试数据库 `vprint-pr-previews`，每个预览有自己的通知 Durable Object 命名空间。会话密钥通过 `wrangler preview base-config secret put BETTER_AUTH_SECRET` 单独设置。新增数据库迁移时，先在预览库运行：
 

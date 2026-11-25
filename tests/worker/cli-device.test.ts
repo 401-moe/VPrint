@@ -21,8 +21,8 @@ beforeAll(async () => {
 });
 
 test("a Preview issues device links on its own HTTPS host", async () => {
-  const bindings = { ...env, VPRINT_PREVIEW_DOMAIN: "pr.vprint.ac" };
-  const origin = "https://test-branch.pr.vprint.ac";
+  const bindings = { ...env, VPRINT_PREVIEW_DOMAIN: "vprint.ac" };
+  const origin = "https://test-branch.vprint.ac";
   const response = await worker.fetch(new Request(origin + "/api/auth/device/code", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
