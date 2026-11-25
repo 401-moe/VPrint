@@ -23,13 +23,18 @@ const children = new Set();
 function run(args) {
   const child = spawn(binary, args, { cwd: root, env: { ...process.env, VPRINT_URL: origin, VPRINT_CONFIG_DIR: join(root, "credentials") }, stdio: ["pipe", "pipe", "pipe"] });
   children.add(child);
-  let output = "";
+  let output = "", stderr = "";
   child.stdout.on("data", chunk => { output += chunk; });
-  child.stderr.resume();
+  child.stderr.on("data", chunk => { stderr += chunk; });
   const done = new Promise((res, rej) => {
     const timeout = setTimeout(() => child.kill(), 90000);
     child.on("error", rej);
-    child.on("close", code => { clearTimeout(timeout); children.delete(child); code === 0 ? res() : rej(new Error("CLI command failed " + args[0])); });
+    child.on("close", (code, signal) => {
+      clearTimeout(timeout);
+      children.delete(child);
+      if (code === 0) res();
+      else rej(new Error(`CLI command ${args[0]} failed (${signal || code}) ${stderr.trim()}`));
+    });
   });
   return { child, output: () => output, done };
 }
@@ -53,13 +58,13 @@ try {
   const approval = await fetch(origin + "/api/cli/device/decision", { method: "POST", headers: { cookie: host, origin, "content-type": "application/json", "x-vprint-device-decision": "1" }, body: JSON.stringify({ userCode: code, approve: true, keepSignedIn: false }) });
   assert.equal(approval.status, 200);
   await login.done;
-  const selection = run(["use"]);
-  selection.child.stdin.end("1\n");
-  await selection.done;
+  await run(["use", "--team", team.id, "--contest", contest.id]).done;
   assert.equal(JSON.parse(await readFile(join(root, ".vprint"), "utf8")).contestId, contest.id);
   await writeFile(join(root, "A.cpp"), source);
-  await run(["A.cpp"]).done;
-  await run(["A.cpp"]).done;
+  const firstPrint = run(["A.cpp", "--yes"]);
+  await firstPrint.done;
+  assert.ok(firstPrint.output().includes(team.name + " / 训练"));
+  await run(["-y", "A.cpp"]).done;
   const { printouts } = await (await api(`/api/contests/${contest.id}/prints`, teammate)).json();
   assert.equal(printouts.length, 2);
   const printed = await (await api(`/api/contests/${contest.id}/prints/${printouts[0].id}`, teammate)).json();
