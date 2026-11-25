@@ -17,6 +17,8 @@ pnpm run dev
 
 ## 在比赛目录打印
 
+从 [GitHub Releases](https://github.com/vprint-ac/VPrint/releases) 下载对应系统的 CLI。从 `v0.1.0-rc.3` 起，CLI 默认连接 `https://vprint.ac`。原先已登录的比赛主机升级后，需要在新站重新授权一次。
+
 运行 `vprint login` 授权本机，然后在训练目录运行 `vprint use` 选择队伍和比赛。在该目录或其子目录执行 `vprint A.cpp`，终端会显示当前比赛、当前时间、文件名、字节数和上次修改时间。看到 `确认打印？ [Y/n]` 后，按回车、`y` 或 `Y` 打印，按 `n` 或 `N` 取消。
 
 每次只接受一个文件。脚本使用 `vprint -y A.cpp` 或 `vprint A.cpp --yes`，同样会显示打印信息。
