@@ -1,9 +1,12 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { AccountSettings } from "./AccountSettings";
+import { Github, KeyRound } from "lucide-react";
 import { DevicePage } from "./DevicePage";
-import "./App.css";
 import { GithubChoice, openGithub } from "./GithubChoice";
+import { PasswordReset } from "./Passwords";
+import { Header } from "./Shell";
+import { Button } from "./components/ui/button";
 import { Workspace } from "./Workspace";
+import { api, ApiError } from "./api";
 
 interface Member {
   id: string;
@@ -17,40 +20,60 @@ const githubPath = "/github/choice";
 const githubBinding = location.pathname === githubPath && new URLSearchParams(location.search).has("bind");
 const otpFallback = location.pathname === "/login" && new URLSearchParams(location.search).get("method") === "otp";
 
+function loginDestination() {
+  if (location.pathname !== "/login") return location.pathname + location.search;
+  const next = new URLSearchParams(location.search).get("next");
+  if (!next?.startsWith("/") || next.startsWith("//")) return "/";
+  let target: URL;
+  try { target = new URL(next, location.origin); } catch { return "/"; }
+  return target.origin === location.origin && target.pathname !== "/login" ? target.pathname + target.search : "/";
+}
+
 const initialForm = { email: "", password: "", name: "" };
 
 export function App() {
   const [member, setMember] = useState<Member | null>(null);
-  const [memberChecked, setMemberChecked] = useState(false);
+  const [sessionState, setSessionState] = useState<"loading" | "ready" | "failed">("loading");
   const [form, setForm] = useState(initialForm);
-  const [mode, setMode] = useState<Mode>(githubBinding ? "signin" : otpFallback ? "otp" : "signup");
+  const [mode, setMode] = useState<Mode>(otpFallback ? "otp" : "signin");
   const [otp, setOtp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [returnTo, setReturnTo] = useState<string | null>(null);
+  const [returnTo, setReturnTo] = useState<string>(loginDestination);
   const emailInput = useRef<HTMLInputElement>(null);
+  const passwordInput = useRef<HTMLInputElement>(null);
+  const otpInput = useRef<HTMLInputElement>(null);
   const [sentTo, setSentTo] = useState("");
+  const [showPasswordReset, setShowPasswordReset] = useState(
+    location.pathname === "/login" && new URLSearchParams(location.search).get("mode") === "reset",
+  );
+  useEffect(() => {
+    const controller = new AbortController();
+    api<Member>("/api/me", { signal: controller.signal })
+      .then(value => {
+        if (controller.signal.aborted) return;
+        if (value && location.pathname === "/login" && new URLSearchParams(location.search).get("mode") !== "reset") {
+          history.replaceState(null, "", loginDestination());
+        }
+        setMember(value);
+        setSessionState("ready");
+      })
+      .catch(cause => {
+        if (!controller.signal.aborted) {
+          setSessionState(cause instanceof ApiError && cause.status === 401 ? "ready" : "failed");
+        }
+      });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
-    let active = true;
-
-    const next = new URLSearchParams(window.location.search).get("next");
-    const location = otpFallback && next?.startsWith("/") && !next.startsWith("//") ? next : window.location.pathname + window.location.search;
-    if (location !== "/") setReturnTo(location);
-
-    fetch("/api/me")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((value) => {
-        if (active) setMember(value as Member | null);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (active) setMemberChecked(true);
-      });
-
-    return () => {
-      active = false;
+    const syncPath = () => {
+      const reset = location.pathname === "/login" && new URLSearchParams(location.search).get("mode") === "reset";
+      if (reset) setForm(previous => ({ ...previous, password: "" }));
+      setShowPasswordReset(reset);
     };
+    window.addEventListener("popstate", syncPath);
+    return () => window.removeEventListener("popstate", syncPath);
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -64,37 +87,26 @@ export function App() {
     setError(null);
 
     try {
-      const response = await fetch(
+      const body = await api<{ user: Member }>(
         mode === "signup" ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email",
         {
           method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(
-            mode === "signup" ? form : { email: form.email, password: form.password },
-          ),
+          body: JSON.stringify(mode === "signup" ? form : { email: form.email, password: form.password }),
         },
+        mode === "signup" ? "注册失败，请检查填写内容。" : "登录失败，请检查邮箱和密码。",
       );
-      const body = (await response.json()) as { user?: Member; message?: string };
-
-      if (!response.ok || !body.user) {
-        setError(
-          body.message ??
-            (mode === "signup" ? "注册失败，请检查填写内容。" : "登录失败，请检查邮箱和密码。"),
-        );
-        return;
-      }
-
       restoreLocation();
       setForm(initialForm);
       setMember(body.user);
-    } catch {
-      setError("网络异常，请稍后重试。");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "网络异常，请稍后重试。");
+      passwordInput.current?.focus();
     } finally {
       setPending(false);
     }
   }
 
-  const otpHeaders: Record<string, string> = { "content-type": "application/json" };
+  const otpHeaders: Record<string, string> = {};
   if (githubBinding) otpHeaders["x-vprint-existing-account"] = "1";
 
   async function requestOtp() {
@@ -103,29 +115,26 @@ export function App() {
     setError(null);
 
     try {
-      const response = await fetch("/api/auth/email-otp/send-verification-otp", {
+      await api("/api/auth/email-otp/send-verification-otp", {
         method: "POST",
         headers: otpHeaders,
         body: JSON.stringify({ email: form.email, type: "sign-in" }),
-      });
-      const body = (await response.json()) as { message?: string };
-
-      if (!response.ok) {
-        setError(body.message ?? "验证码发送失败，请稍后重试。");
-        return;
-      }
+      }, "验证码发送失败，请稍后重试。");
       setSentTo(form.email);
-    } catch {
-      setError("网络异常，请稍后重试。");
+      otpInput.current?.focus();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "网络异常，请稍后重试。");
     } finally {
       setPending(false);
     }
   }
 
   function switchMode(nextMode: Mode) {
+    if (githubBinding && nextMode === "signup") return;
     setMode(nextMode);
     setError(null);
     if (nextMode === "otp") emailInput.current?.focus();
+    else if (nextMode === "signin") passwordInput.current?.focus();
   }
 
   async function signInWithOtp() {
@@ -133,24 +142,18 @@ export function App() {
     setError(null);
 
     try {
-      const response = await fetch("/api/auth/sign-in/email-otp", {
+      const body = await api<{ user: Member }>("/api/auth/sign-in/email-otp", {
         method: "POST",
         headers: otpHeaders,
         body: JSON.stringify({ email: form.email, otp }),
-      });
-      const body = (await response.json()) as { user?: Member; message?: string };
-
-      if (!response.ok || !body.user) {
-        setError(body.message ?? "登录失败，请检查验证码。");
-        return;
-      }
-
+      }, "登录失败，请检查验证码。");
       restoreLocation();
       setForm(initialForm);
       setOtp("");
       setMember(body.user);
-    } catch {
-      setError("网络异常，请稍后重试。");
+    } catch (cause) {
+      otpInput.current?.focus();
+      setError(cause instanceof Error ? cause.message : "网络异常，请稍后重试。");
     } finally {
       setPending(false);
     }
@@ -163,167 +166,176 @@ export function App() {
     if (target.origin !== window.location.origin) return;
 
     window.history.replaceState(null, "", `${target.pathname}${target.search}`);
-    setReturnTo(null);
+    setReturnTo("/");
   }
 
   async function signOut() {
     setPending(true);
 
     try {
-      const response = await fetch("/api/auth/sign-out", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: "{}",
-      });
-
-      if (!response.ok) {
-        setError("退出失败，请稍后重试。");
-        return;
-      }
-
+      await api("/api/auth/sign-out", { method: "POST", body: "{}" }, "退出失败，请稍后重试。");
       setMember(null);
       setMode("signin");
       setReturnTo(`${window.location.pathname}${window.location.search}`);
       setError(null);
-    } catch {
-      setError("网络异常，请稍后重试。");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "网络异常，请稍后重试。");
     } finally {
       setPending(false);
     }
   }
 
-  if (!memberChecked) {
-    return (
-      <main className="shell" aria-busy="true">
-        <section className="card">
-          <h1 className="title">VPrint</h1>
-          <p className="subtitle loading-subtitle">正在读取登录状态…</p>
-        </section>
-      </main>
-    );
-  }
+  if (sessionState === "loading") return <Header />;
+  if (sessionState === "failed") return <>
+    <Header />
+    <main className="vp-auth-main">
+      <section className="unavailable">
+        <h1>无法读取登录状态</h1>
+        <p className="vp-note">请检查网络后重试。</p>
+        <Button variant="outline" onClick={() => location.reload()}>重新加载</Button>
+      </section>
+    </main>
+  </>;
 
   if (location.pathname === githubPath && (!githubBinding || member)) return <GithubChoice member={member} />;
 
+  if (showPasswordReset) {
+    const firstPassword = new URLSearchParams(location.search).get("first") === "1";
+    return <><Header /><div className="vp-standalone"><main className="vp-auth-main">
+      <PasswordReset initialEmail={member?.email || form.email} firstPassword={firstPassword && !!member}
+        signedIn={!!member} onReturn={(email, completed) => {
+          if (member && !completed) { location.replace("/account"); return; }
+          setForm({ ...initialForm, email });
+          setMember(null);
+          setMode("signin");
+          setError(null);
+          setShowPasswordReset(false);
+          history.replaceState(null, "", "/login?next=" + encodeURIComponent(returnTo));
+          requestAnimationFrame(() => passwordInput.current?.focus());
+        }} />
+    </main></div></>;
+  }
+
   if (!member) {
     return (
-      <main className="shell">
-        <section className="card" aria-labelledby="auth-title">
-          <h1 className="title" id="auth-title">
-            VPrint
-          </h1>
-          <p className="subtitle">队员的队内电子打印工作台</p>
-          <form className="fields" onSubmit={submit}>
-            {mode === "signup" && (
-              <label className="field">
-                姓名
-                <input
-                  name="name"
-                  autoComplete="name"
-                  value={form.name}
-                  onChange={(event) => setForm({ ...form, name: event.target.value })}
-                  required
-                />
-              </label>
-            )}
-            <label className="field">
-              邮箱
-              <input
-                ref={emailInput}
-                name="email"
-                type="email"
-                autoComplete="email"
-                value={form.email}
-                onChange={(event) => setForm({ ...form, email: event.target.value })}
-                required
-              />
-            </label>
-            {mode !== "otp" && (
-              <label className="field">
-                密码
-                <input
-                  name="password"
-                  type="password"
-                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                  minLength={8}
-                  value={form.password}
-                  onChange={(event) => setForm({ ...form, password: event.target.value })}
-                  required
-                />
-              </label>
-            )}
-            {mode === "otp" && (
-              <label className="field">
-                验证码
-                <input
-                  name="otp"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  pattern="\d{6}"
-                  maxLength={6}
-                  value={otp}
-                  onChange={(event) => setOtp(event.target.value)}
-                  required
-                />
-              </label>
-            )}
-            {mode === "otp" && (
-              <button
-                className="button secondary"
-                type="button"
-                disabled={pending}
-                onClick={() => void requestOtp()}
-              >
-                发送验证码
-              </button>
-            )}
-            {mode === "otp" && sentTo === form.email && sentTo && <p role="status">验证码已发送至 {sentTo}</p>}
-            {error && (
-              <p className="error" role="alert">
-                {error}
-              </p>
-            )}
-            <button className="button" type="submit" disabled={pending}>
-              {pending
-                ? "处理中…"
-                : mode === "signup"
-                  ? "创建账号"
-                  : mode === "otp"
-                    ? "验证并登录"
-                    : "登录"}
-            </button>
-          </form>
-          {!githubBinding && mode !== "signup" && <button className="button secondary" type="button" disabled={pending} onClick={() => switchMode("signup")}>第一次使用？创建账号</button>}
-          <button
-            className="button secondary"
-            type="button"
-            disabled={pending}
-            onClick={() =>
-              switchMode(mode === "signup" ? "signin" : mode === "signin" ? "otp" : "signin")
-            }
-          >
-            {mode === "signup"
-              ? "已有账号？去登录"
-              : mode === "signin"
-                ? "使用邮箱验证码"
-                : "返回密码登录"}
-          </button>
-          {!githubBinding && <button className="button secondary" type="button" disabled={pending} onClick={async () => {
-            setPending(true);
-            try { await openGithub(returnTo ?? "/"); }
-            catch (cause) { setError(cause instanceof Error ? cause.message : "GitHub 登录失败。"); setPending(false); }
-          }}>使用 GitHub 登录</button>}
-        </section>
-      </main>
+      <>
+        <Header />
+        <div className="vp-standalone">
+          <main className="vp-auth-main">
+              <div className="identity-page">
+                <header className="vp-heading identity-heading">
+                  <div>
+                    <h1>登录训练工作区</h1>
+                    <p>{githubBinding ? "验证已有账号后绑定这个 GitHub 身份。" : "登录后可查看本队比赛和打印件。"}</p>
+                  </div>
+                </header>
+                <section className="vp-panel identity-panel" aria-labelledby="login-panel-title">
+                  <div className="identity-switch" role="group" aria-label="登录方式">
+                    {(githubBinding ? ["signin", "otp"] as const : ["signin", "otp", "signup"] as const).map(nextMode => (
+                      <Button key={nextMode} type="button" variant="outline" className="vp-secondary"
+                        aria-pressed={mode === nextMode} onClick={() => switchMode(nextMode)}>
+                        {nextMode === "signin" ? "密码登录" : nextMode === "otp" ? "验证码登录" : "注册"}
+                      </Button>
+                    ))}
+                  </div>
+                  <h2 className="sr-only" id="login-panel-title">
+                    {mode === "signup" ? "创建账号" : mode === "otp" ? "邮箱验证码登录" : "密码登录"}
+                  </h2>
+                  <form className="vp-form" onSubmit={submit} onChange={() => setError(null)}>
+                    {mode === "signup" && (
+                      <label className="vp-field" htmlFor="login-name">姓名
+                        <input id="login-name" name="name" autoComplete="name" value={form.name}
+                          onChange={event => setForm({ ...form, name: event.target.value })} required />
+                      </label>
+                    )}
+                    <label className="vp-field" htmlFor="login-email">邮箱
+                      <input id="login-email" ref={emailInput} name="email" type="email" autoComplete="email"
+                        value={form.email} onChange={event => { setForm({ ...form, email: event.target.value }); setSentTo(""); }} required />
+                    </label>
+                    {mode !== "otp" && (
+                      <div className="vp-field">
+                        <div className="identity-field-heading">
+                          <label htmlFor="login-password">{mode === "signup" ? "设置密码" : "密码"}</label>
+                          {mode === "signin" && !githubBinding && (
+                            <a className="password-recovery-link"
+                              href={`/login?mode=reset&next=${encodeURIComponent(returnTo)}`}
+                              onClick={event => {
+                                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                                event.preventDefault();
+                                history.pushState(null, "", event.currentTarget.href);
+                                setShowPasswordReset(true);
+                              }}>忘记密码？</a>
+                          )}
+                        </div>
+                        <input id="login-password" name="password" type="password"
+                          ref={passwordInput}
+                          autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                          minLength={8} maxLength={128} placeholder="8–128 个字符" value={form.password}
+                          onChange={event => setForm({ ...form, password: event.target.value })} required />
+                      </div>
+                    )}
+                    {mode === "otp" && (
+                      <div className="vp-field">
+                        <label htmlFor="login-otp">邮箱验证码</label>
+                        <div className="otp-entry">
+                          <input ref={otpInput} id="login-otp" name="otp" inputMode="numeric" autoComplete="one-time-code"
+                            pattern="[0-9]{6}" maxLength={6} value={otp}
+                            onChange={event => setOtp(event.target.value)} required />
+                          <Button type="button" variant="outline" className="vp-secondary" disabled={pending}
+                            onClick={() => void requestOtp()}>
+                            {sentTo === form.email && sentTo ? "重新发送" : "获取验证码"}
+                          </Button>
+                        </div>
+                        {sentTo === form.email && sentTo && <p className="vp-meta" role="status">验证码已发送至 {sentTo}</p>}
+                      </div>
+                    )}
+                    {error && <p className="vp-error" role="alert">{error}</p>}
+                    <div className="identity-submit">
+                      <Button type="submit" className="vp-primary" disabled={pending}>
+                        <KeyRound size={15} aria-hidden="true" />
+                        {pending ? "处理中…" : mode === "signup" ? "创建并进入" : mode === "otp" ? "验证并登录" : "登录"}
+                      </Button>
+                      {!githubBinding && (
+                        <Button type="button" variant="outline" className="vp-secondary" disabled={pending}
+                          onClick={async () => {
+                            setPending(true);
+                            try { await openGithub(returnTo); }
+                            catch (cause) {
+                              setError(cause instanceof Error ? cause.message : "GitHub 登录失败。");
+                              setPending(false);
+                            }
+                          }}>
+                          <Github size={15} aria-hidden="true" />使用 GitHub 登录
+                        </Button>
+                      )}
+                    </div>
+                  </form>
+                  {githubBinding && (
+                    <Button type="button" variant="outline" className="vp-secondary identity-cancel"
+                      onClick={() => location.replace("/github/choice")}>返回 GitHub 选择</Button>
+                  )}
+                </section>
+              </div>
+          </main>
+        </div>
+      </>
     );
   }
 
-  if (location.pathname === "/account") return <AccountSettings email={member.email} />;
-  if (location.pathname === "/device") return <DevicePage email={member.email} />;
+  if (location.pathname === "/device") {
+    return (
+      <>
+        <Header />
+        <main className="vp-standalone vp-auth-main">
+          <DevicePage email={member.email} />
+        </main>
+      </>
+    );
+  }
 
   return (
-    <main className="shell">
+    <>
       <Workspace member={member} error={error} pending={pending} signOut={signOut} />
-    </main>
+    </>
   );
 }

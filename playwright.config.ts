@@ -1,9 +1,9 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 
 const port = Number(process.env.VPRINT_E2E_PORT ?? 8787);
 const baseURL = `http://127.0.0.1:${port}`;
 const wrangler = "node_modules/.bin/wrangler";
-const state = "--persist-to .wrangler/browser-test";
+const state = `--persist-to .wrangler/browser-test/${port}`;
 
 export default defineConfig({
   testDir: "./tests/browser",
@@ -15,6 +15,10 @@ export default defineConfig({
     headless: true,
     trace: "retain-on-failure",
   },
+  projects: [
+    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
+    { name: "mobile", use: { ...devices["Pixel 7"], viewport: { width: 390, height: 844 } } },
+  ],
   webServer: {
     command: [
       "node_modules/.bin/vite build",
