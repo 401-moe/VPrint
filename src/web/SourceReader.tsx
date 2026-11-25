@@ -8,21 +8,16 @@ import rust from "highlight.js/lib/languages/rust";
 import go from "highlight.js/lib/languages/go";
 import javascript from "highlight.js/lib/languages/javascript";
 import "highlight.js/styles/github.css";
+import { grammarForFilename } from "./LanguageIcon";
 import "./source-reader.css";
 
 for (const [name, language] of Object.entries({ cpp, python, java, kotlin, rust, go, javascript })) {
   hljs.registerLanguage(name, language);
 }
 
-const extensions: Record<string, string> = {
-  c: "cpp", h: "cpp", cc: "cpp", cpp: "cpp", cxx: "cpp", hpp: "cpp",
-  py: "python", java: "java", kt: "kotlin", kts: "kotlin", rs: "rust", go: "go", js: "javascript",
-};
-
 export function SourceReader({ filename, source }: { filename: string; source: string }) {
   const text = source.replace(/\r\n?/g, "\n");
-  const extension = /\.([a-z0-9]+)$/i.exec(filename)?.[1].toLowerCase();
-  const language = extension && Object.hasOwn(extensions, extension) ? extensions[extension] : undefined;
+  const language = grammarForFilename(filename) || undefined;
   const highlighted = useMemo(() => language ? hljs.highlight(text, { language }).value : null, [text, language]);
   const lines = useMemo(() => {
     const count = text.replace(/\n$/, "").split("\n").length;

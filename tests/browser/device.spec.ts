@@ -23,5 +23,26 @@ test("device authorization waits for the signed-in member to check the code and 
   await remember.check();
   await page.getByRole("button", { name: "批准登录" }).click();
   await expect(page.getByRole("heading", { name: "已批准主机登录" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "已批准主机登录" })).toBeFocused();
+  await expect(page.getByText("CLI 会话有效期为 30 天。")).toBeVisible();
   expect(decisions).toEqual([{ userCode: "BCDF-GHJK", approve: true, keepSignedIn: true }]);
+});
+
+test("device authorization keeps an invalid code editable and announces the error", async ({ page }) => {
+  let requests = 0;
+  await page.route("**/api/me", route => route.fulfill({ json: { id: "member", name: "队员", email: "runner@example.test" } }));
+  await page.route("**/api/cli/device?*", route => {
+    requests++;
+    return route.fulfill({ status: 404, json: { error: "user code not found" } });
+  });
+  await page.goto("/device?user_code=WRONG-CODE");
+  const code = page.getByLabel("终端短码");
+  await expect(code).toBeFocused();
+  await page.getByRole("button", { name: "核对短码" }).click();
+  await expect(page.getByRole("alert")).toContainText("短码无效或已过期");
+  await expect(code).toHaveAttribute("aria-invalid", "true");
+  await code.fill("WRONG-CODE-2");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(code).toHaveAttribute("aria-invalid", "false");
+  expect(requests).toBe(1);
 });

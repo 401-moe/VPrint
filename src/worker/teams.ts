@@ -281,8 +281,13 @@ teamsRoutes.get("/workspace", async (context) => {
 
   const contests = await context.env.DB.prepare(
     `
-      SELECT c.id, c.name, c.createdAt
+      SELECT c.id, c.name, c.createdAt,
+        (SELECT COUNT(*) FROM printout WHERE contestId = c.id) AS printCount,
+        p.id AS latestPrintId, p.filename AS latestFilename, p.createdAt AS latestPrintAt
       FROM contest c JOIN team_member m ON m.teamId = c.teamId
+      LEFT JOIN printout p ON p.id = (
+        SELECT id FROM printout WHERE contestId = c.id ORDER BY createdAt DESC, id DESC LIMIT 1
+      )
       WHERE c.teamId = ? AND m.userId = ?
       ORDER BY c.createdAt DESC, c.id DESC
     `,

@@ -9,6 +9,16 @@ interface MemberRow {
   role: string;
 }
 
+interface InvitationPreview {
+  teamId: string;
+  teamName: string;
+  ownerName: string | null;
+  memberCount: number;
+  contestCount: number;
+  printoutCount: number;
+  joined: number;
+}
+
 type TeamManagementContext = {
   Bindings: Environment;
 };
@@ -73,6 +83,38 @@ teamManagementRoutes.get("/teams/:teamId/members", async (context) => {
     .all<MemberRow>();
 
   return context.json({ members: members.results });
+});
+
+teamManagementRoutes.get("/team-invitations/:token", async (context) => {
+  const token = context.req.param("token");
+  const user = await currentUser(context);
+  if (!user) return context.json({ error: "authentication required" }, 401);
+  if (!/^[a-f0-9]{32}$/.test(token)) return context.json({ error: "invitation not found" }, 404);
+
+  const preview = await context.env.DB.prepare(
+    `
+      SELECT team.id AS teamId, team.name AS teamName, owner.name AS ownerName,
+        (SELECT COUNT(*) FROM team_member WHERE team_member.teamId = team.id) AS memberCount,
+        (SELECT COUNT(*) FROM contest WHERE contest.teamId = team.id) AS contestCount,
+        (SELECT COUNT(*) FROM printout JOIN contest ON contest.id = printout.contestId
+          WHERE contest.teamId = team.id) AS printoutCount,
+        EXISTS (
+          SELECT 1 FROM team_member
+          WHERE team_member.teamId = team.id AND team_member.userId = ?
+        ) AS joined
+      FROM team
+      LEFT JOIN team_member AS ownerMember
+        ON ownerMember.teamId = team.id AND ownerMember.role = 'owner'
+      LEFT JOIN user AS owner ON owner.id = ownerMember.userId
+      WHERE team.invitationToken = ?
+      LIMIT 1
+    `,
+  )
+    .bind(user.id, token)
+    .first<InvitationPreview>();
+  if (!preview) return context.json({ error: "invitation not found" }, 404);
+  const { joined, ...metadata } = preview;
+  return context.json({ ...metadata, joined: joined === 1 });
 });
 
 teamManagementRoutes.post("/teams/:teamId/invitation", async (context) => {

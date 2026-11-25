@@ -45,6 +45,7 @@ function createAuthOptions(env: AuthEnvironment, { cliProtocol, existingAccountO
     disabledPaths: ["/device/approve", "/device/deny", ...(cliProtocol ? [] : ["/oauth2/token", "/device/code"])],
     emailAndPassword: {
       enabled: true,
+      revokeSessionsOnPasswordReset: true,
     },
     plugins: [
       createEmailOtpPlugin(env, existingAccountOnly),

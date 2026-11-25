@@ -1,22 +1,23 @@
-.print-page { box-sizing: border-box; min-width: 0; max-width: 76rem; }
-.shell:has(.print-page) { grid-template-columns: minmax(0, 1fr); align-items: start; }
 .source-scroll {
   display: flex;
   overflow-x: auto;
-  margin-top: 1.25rem;
-  padding: 0.75rem 0;
-  font: 14px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
+  margin: 0;
+  padding: 16px 18px 32px;
+  font: 14px/1.65 var(--mono);
   tab-size: 4;
+  color: var(--body-ink);
+  background: var(--sheet);
+  min-width: 0;
+  max-width: 100%;
 }
 .source-scroll pre, .source-scroll code, .source-lines {
   margin: 0;
   font: inherit;
   white-space: pre;
 }
-.source-lines { color: #656d76; user-select: none; padding: 0 1rem 0 0.25rem; text-align: right; }
+.source-lines { color: var(--muted); flex: none; user-select: none; padding-right: 1rem; text-align: right; font-variant-numeric: tabular-nums; }
 .source-lines::before { content: attr(data-lines); }
 .source-scroll pre { flex: none; padding-right: 1rem; }
-@media (max-width: 42rem) {
-  .shell:has(.print-page) { padding: 0.5rem; }
-  .print-page { padding: 1rem; }
-}
+.source-loading { min-height: 264px; }
+@media(max-width:680px) { .source-loading { min-height: 160px; } }
+@media(max-width:680px) { .source-scroll { padding: 10px 8px 20px; } }

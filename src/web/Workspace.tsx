@@ -1,392 +1,182 @@
-import { FormEvent, type MouseEvent, useCallback, useEffect, useState } from "react";
+import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
+import { LogOut } from "lucide-react";
+import { api, ApiError } from "./api";
 import { TeamManagement } from "./TeamManagement";
-
-import { DeleteGroup } from "./DeleteGroup";
-import { usePrintNotifications } from "./use-print-notifications";
+import { AccountSettings } from "./AccountSettings";
+import { InvitePage } from "./InvitePage";
+import { ContestWorkspace, type ContestSummary } from "./ContestWorkspace";
 import { PrintList, PrintPage } from "./ContestPrints";
-
-interface Member {
-  id: string;
-  email: string;
-  name: string;
-}
-
-interface Team {
-  id: string;
-  name: string;
-  role: string;
-  invitationUrl: string;
-}
-
-interface Contest {
-  id: string;
-  name: string;
-  createdAt: number;
-  teamId?: string;
-}
+import { Header, CreateTeamDialog, TeamSwitcher, Sidebar, type Team } from "./Shell";
+import { usePrintNotifications } from "./use-print-notifications";
 
 interface WorkspaceData {
   teams: Team[];
   selectedTeamId: string | null;
-  contests: Contest[];
-  contest: Contest | null;
+  contests: ContestSummary[];
+  contest: { id: string; name: string; createdAt: number; teamId: string } | null;
 }
+type Member = { id: string; name: string; email: string };
 
-type WorkspaceState =
-  | { status: "loading" }
-  | { status: "denied" }
-  | { status: "ready"; data: WorkspaceData };
-
-const emptyWorkspace: WorkspaceData = {
-  teams: [],
-  selectedTeamId: null,
-  contests: [],
-  contest: null,
-};
-
-function formatTimestamp(value: number) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(value);
-}
-
-async function requestJson(path: string, init: RequestInit = {}) {
-  const response = await fetch(path, {
-    headers: { "content-type": "application/json", ...(init.headers ?? {}) },
-    ...init,
-  });
-  const body = (await response.json()) as Record<string, unknown>;
-  if (!response.ok) {
-    throw new Error(
-      typeof body.error === "string" ? body.error : "请求失败，请稍后重试。",
-    );
-  }
-  return body;
-}
-
-export function Workspace({
-  member,
-  error,
-  pending,
-  signOut,
-}: {
-  member: Member;
-  error: string | null;
-  pending: boolean;
-  signOut: () => void;
+export function Workspace({ member, pending, error, signOut }: {
+  member: Member; pending: boolean; error: string | null; signOut: () => void;
 }) {
-  const [workspaceState, setWorkspaceState] = useState<WorkspaceState>({
-    status: "loading",
-  });
-  const workspace = workspaceState.status === "ready" ? workspaceState.data : emptyWorkspace;
-  const [path, setPath] = useState(window.location.pathname);
-  const printId = path.match(/\/print\/([a-f0-9-]{36})$/)?.[1];
-  const [version, setVersion] = useState(0);
+  const [path, setPath] = useState(location.pathname);
+  const match = /^\/contest\/([^/]+)(?:\/print\/([^/]+))?$/.exec(path);
+  const contestId = match?.[1] ?? "";
+  const printId = match?.[2] ?? "";
+  const invite = /^\/invite\/([^/]+)$/.exec(path);
+  const isInvite = Boolean(invite);
+  const teamPage = path === "/team";
+  const account = path === "/account";
+  const scoped = !account && !isInvite;
+  const [snapshot, setSnapshot] = useState<{ key: string; data: WorkspaceData }>();
+  const data = snapshot?.key === contestId ? snapshot.data : undefined;
+  const team = data?.teams.find(t => t.id === data.selectedTeamId);
+  const [revision, setRevision] = useState(0);
+  const refresh = useCallback(() => setRevision(v => v + 1), []);
+  const [failed, setFailed] = useState<{ key: string; denied: boolean } | null>(null);
+  const [actionError, setActionError] = useState("");
+  const [switching, setSwitching] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [listVersion, setListVersion] = useState(0);
   const [noticeId, setNoticeId] = useState("");
-  usePrintNotifications(workspace.contest?.id ?? "", Boolean(printId), notice => {
-    if (notice.type === "reload") setVersion(value => value + 1);
+  const returnState = useRef<{ contestId: string; printId: string; scrollY: number } | null>(null);
+  usePrintNotifications(data?.contest?.id ?? "", !!printId, notice => {
+    if (notice.type === "reload") setListVersion(v => v + 1);
     if (notice.type === "toast" && notice.id) setNoticeId(notice.id);
   });
-  useEffect(() => {
-    if (!noticeId) return;
-    const timeout = setTimeout(() => setNoticeId(""), 3500);
-    return () => clearTimeout(timeout);
-  }, [noticeId]);
-  function navigatePrint(event: MouseEvent<HTMLAnchorElement>) {
-    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-    event.preventDefault();
-    const next = event.currentTarget.pathname;
-    window.history.pushState(null, "", next);
-    setPath(next);
-    setNoticeId("");
-    window.scrollTo(0, 0);
-  }
-  const [teamName, setTeamName] = useState("");
-  const [contestName, setContestName] = useState("");
-  const [showTeamForm, setShowTeamForm] = useState(false);
-  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
-  const [workspacePending, setWorkspacePending] = useState(false);
-  const [invitationUrl, setInvitationUrl] = useState("");
 
-  const loadWorkspace = useCallback(async () => {
-    const contestId = window.location.pathname.match(/^\/contest\/([a-f0-9-]{36})(?:\/print\/[a-f0-9-]{36})?$/)?.[1];
-    try {
-      const query = contestId ? `?contestId=${contestId}` : "";
-      const data = (await requestJson(`/api/workspace${query}`)) as unknown as WorkspaceData;
-      setWorkspaceState({ status: "ready", data });
-      const selected = data.teams.find((team) => team.id === data.selectedTeamId);
-      if (selected) setInvitationUrl(selected.invitationUrl);
-    } catch (cause) {
-      setWorkspaceState({ status: "denied" });
-    }
+  useEffect(() => {
+    if (!scoped) return;
+    const controller = new AbortController();
+    setFailed(null);
+    api<WorkspaceData>("/api/workspace" + (contestId ? "?contestId=" + encodeURIComponent(contestId) : ""), { signal: controller.signal })
+      .then(value => { if (!controller.signal.aborted) setSnapshot({ key: contestId, data: value }); })
+      .catch(cause => {
+        if (controller.signal.aborted) return;
+        setSnapshot(undefined);
+        setFailed({ key: contestId, denied: cause instanceof ApiError && [403, 404].includes(cause.status) });
+      });
+    return () => controller.abort();
+  }, [contestId, scoped, revision]);
+  useEffect(() => {
+    const restore = () => { setPath(location.pathname); setNoticeId(""); setActionError(""); };
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
   }, []);
-
   useEffect(() => {
-    const back = () => { setPath(window.location.pathname); setNoticeId(""); void loadWorkspace(); };
-    window.addEventListener("popstate", back);
-    return () => window.removeEventListener("popstate", back);
-  }, [loadWorkspace]);
+    document.title = (account ? "账号设置" : teamPage ? "队伍设置" : isInvite ? "队伍邀请" : data?.contest?.name || team?.name || "比赛工作台") + " · VPrint";
+  }, [account, teamPage, isInvite, data?.contest?.name, team?.name]);
 
-  useEffect(() => {
-    const invitationToken = window.location.pathname.match(/^\/invite\/([a-f0-9]{32})$/)?.[1];
-    if (!invitationToken) {
-      void loadWorkspace();
-      return;
-    }
-
-    requestJson(`/api/team-invitations/${invitationToken}/join`, {
-      method: "POST",
-      body: "{}",
-    })
-      .then((team) => requestJson(`/api/teams/${(team as { id: string }).id}/selection`, {
-        method: "PUT",
-        body: "{}",
-      }))
-      .then(() => loadWorkspace())
-      .catch((cause: unknown) => {
-        window.history.replaceState(null, "", "/");
-        void loadWorkspace();
-        setWorkspaceError(
-          cause instanceof Error && cause.message === "authentication required"
-            ? "请登录后使用邀请链接。"
-            : "邀请链接无效。",
-        );
-      });
-  }, [loadWorkspace]);
-
-  async function createTeam(event: FormEvent<HTMLFormElement>) {
+  function navigate(to: string) {
+    if (location.pathname !== to) history.pushState(null, "", to);
+    setPath(to); setActionError(""); setNoticeId("");
+    if (!to.match(/^\/contest\/[\w-]+$/)) window.scrollTo(0, 0);
+  }
+  async function persistSelection(id: string) {
+    await api(`/api/teams/${id}/selection`, { method: "PUT", body: "{}" });
+    if (id !== team?.id) setSnapshot(undefined);
+    refresh();
+  }
+  async function select(id: string, destination?: string) {
+    if (switching) return;
+    setSwitching(true); setActionError("");
+    try {
+      await persistSelection(id);
+      if (destination || contestId) navigate(destination ?? "/");
+    } catch { setActionError("切换队伍失败，请重试。"); }
+    finally { setSwitching(false); }
+  }
+  function follow(event: MouseEvent<HTMLElement>) {
+    if (event.defaultPrevented || event.button || event.metaKey || event.altKey || event.shiftKey || event.ctrlKey) return;
+    const anchor = event.target instanceof Element ? event.target.closest("a") : null;
+    if (!anchor || anchor.target || anchor.hasAttribute("download")) return;
+    const url = new URL(anchor.href);
+    if (url.origin !== location.origin || url.hash || url.search ||
+        !(/^\/contest\/[\w-]+(?:\/print\/[\w-]+)?$/.test(url.pathname) || ["/", "/team", "/account"].includes(url.pathname))) return;
     event.preventDefault();
-    setWorkspacePending(true);
-    setWorkspaceError(null);
-
+    const nextPrint = /^\/contest\/([\w-]+)\/print\/([\w-]+)$/.exec(url.pathname);
+    if (nextPrint) {
+      returnState.current = !printId && nextPrint[1] === contestId
+        ? { contestId, printId: nextPrint[2], scrollY: window.scrollY } : null;
+    } else if (!printId || url.pathname !== `/contest/${contestId}`) {
+      returnState.current = null;
+    }
+    if (contestId && url.pathname === "/" && team) void select(team.id, "/");
+    else navigate(url.pathname);
+  }
+  async function join(teamId: string) { await persistSelection(teamId); navigate("/"); }
+  async function createTeam(name: string) {
+    const created = await api<Team>("/api/teams", { method: "POST", body: JSON.stringify({ name }) });
     try {
-      const team = (await requestJson("/api/teams", {
-        method: "POST",
-        body: JSON.stringify({ name: teamName }),
-      })) as { id: string; name: string; role: string; invitationUrl: string };
-      setTeamName("");
-      setInvitationUrl(team.invitationUrl);
-      await requestJson(`/api/teams/${team.id}/selection`, {
-        method: "PUT",
-        body: "{}",
-      });
-      await loadWorkspace();
-      setShowTeamForm(false);
-    } catch (cause) {
-      setWorkspaceError(cause instanceof Error ? cause.message : "创建队伍失败。");
-    } finally {
-      setWorkspacePending(false);
+      await persistSelection(created.id);
+      navigate("/");
+    } catch {
+      refresh();
+      setActionError("队伍已创建。请在顶部队伍菜单中选择新队伍。");
     }
   }
 
-  async function createContest(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const teamId = workspace.selectedTeamId;
-    if (!teamId) return;
-    setWorkspacePending(true);
-    setWorkspaceError(null);
+  function updateInvitation(url: string) {
+    if (!team) return;
+    setSnapshot(current => {
+      if (!current) return current;
+      const teams = current.data.teams.map(t => t.id === team.id ? { ...t, invitationUrl: url } : t);
+      return { ...current, data: { ...current.data, teams } };
+    });
+  }
 
-    try {
-      await requestJson(`/api/teams/${teamId}/contests`, {
-        method: "POST",
-        body: JSON.stringify({ name: contestName }),
-      });
-      setContestName("");
-      await loadWorkspace();
-    } catch (cause) {
-      setWorkspaceError(cause instanceof Error ? cause.message : "创建比赛失败。");
-    } finally {
-      setWorkspacePending(false);
+  const create = () => dialog.current?.showModal();
+  const navigation = <Header>{scoped && data && <TeamSwitcher teams={data.teams} selected={team}
+    pending={switching} select={id => void select(id)} create={create}/>}</Header>;
+  const message = error || actionError;
+  function loading() {
+    if (failed?.key !== contestId) {
+      return <p className="vp-meta" role="status">正在读取{contestId ? "比赛" : "工作台"}…</p>;
     }
+    const denied = Boolean(contestId) && failed.denied;
+    return <section className="unavailable">
+      <h1>{denied ? "无法访问比赛" : contestId ? "无法读取比赛" : "无法读取工作台"}</h1>
+      <p className="vp-note">{denied ? "比赛可能已删除，或你尚未加入这支队伍。" : "请检查网络后重试。"}</p>
+      <button className="vp-text-action" onClick={refresh}>重新加载</button>
+      {contestId && <a className="vp-text-action" href="/">返回工作台</a>}
+    </section>;
   }
 
-  async function switchTeam(teamId: string) {
-    setWorkspacePending(true);
-    setWorkspaceError(null);
-
-    try {
-      await requestJson(`/api/teams/${teamId}/selection`, {
-        method: "PUT",
-        body: "{}",
-      });
-      await loadWorkspace();
-    } catch (cause) {
-      setWorkspaceError(cause instanceof Error ? cause.message : "切换队伍失败。");
-    } finally {
-      setWorkspacePending(false);
-    }
+  function contestView() {
+    if (!data?.contest) return <main className="files-shell">{loading()}</main>;
+    const props = { contestId, contestName: data.contest.name, createdAt: data.contest.createdAt, navigate: follow };
+    if (printId) return <PrintPage key={printId} {...props} printId={printId} noticeId={noticeId}/>;
+    return <PrintList key={contestId} {...props} returnHref="/" version={listVersion} returnState={returnState.current?.contestId === contestId ? returnState.current : null}/>;
   }
 
-  async function returnToTeam() {
-    window.history.pushState({}, "", "/");
-    await requestJson("/api/teams/" + workspace.contest?.teamId + "/selection", {
-      method: "PUT",
-      body: "{}",
-    }).catch(() => undefined);
-    await loadWorkspace();
+  function workspaceView() {
+    if (account) return <>
+      <AccountSettings name={member.name} email={member.email}/>
+      <button type="button" className="mobile-signout settings-action" disabled={pending} onClick={signOut}>
+        <LogOut size={15}/>退出登录
+      </button>
+    </>;
+    if (invite) return <InvitePage key={invite[1]} token={invite[1]} onJoined={join}/>;
+    if (!data) return loading();
+    if (!teamPage) return <ContestWorkspace key={team?.id} team={team} contests={data.contests} refresh={refresh} createTeam={create}/>;
+    if (!team) return <section className="vp-settings">
+      <header className="vp-heading"><h1>队伍设置</h1></header>
+      <div className="settings-panel teams-empty">请先创建队伍或通过邀请链接加入。
+        <button className="settings-action" onClick={create}>新建队伍</button>
+      </div>
+    </section>;
+    return <TeamManagement key={team.id} teamId={team.id} role={team.role} memberId={member.id}
+      invitationUrl={team.invitationUrl} onInvitationChange={updateInvitation} onTeamChanged={refresh}/>;
   }
 
-  const selectedTeam = workspace.teams.find((team) => team.id === workspace.selectedTeamId);
-  const busy = pending || workspacePending;
-  const displayedError = workspaceError ?? error;
-
-  if (workspaceState.status === "denied") {
-    return (
-      <section className="workspace-card" aria-labelledby="denied-title">
-        <h1 className="title" id="denied-title">
-          无法访问比赛
-        </h1>
-        <p className="member-name">这份比赛不属于你的队伍。</p>
-        <button className="button" type="button" onClick={returnToTeam}>
-          返回队伍
-        </button>
-      </section>
-    );
-  }
-
-  if (workspaceState.status === "loading") {
-    return (
-      <section className="workspace-card" aria-busy="true">
-        <h1 className="title">正在读取工作台…</h1>
-      </section>
-    );
-  }
-
-  if (workspace.contest) {
-    if (printId) return <PrintPage key={printId} contestId={workspace.contest.id} printId={printId} noticeId={noticeId} navigate={navigatePrint} />;
-    return (
-      <section className="workspace-card" aria-labelledby="contest-title">
-        <header className="workspace-header">
-          <div>
-            <h1 className="title" id="contest-title">
-              {workspace.contest.name}
-            </h1>
-            <p className="member-name">{formatTimestamp(workspace.contest.createdAt)}</p>
-          </div>
-          <button className="button secondary" type="button" onClick={returnToTeam}>
-            返回队伍
-          </button>
-        </header>
-        <a href="https://github.com/401-moe/VPrint/releases">安装 CLI</a>
-        <PrintList contestId={workspace.contest.id} version={version} navigate={navigatePrint} />
-        {selectedTeam?.role === "owner" && <DeleteGroup kind="contest" id={workspace.contest.id} onDeleted={() => void returnToTeam()} />}
-      </section>
-    );
-  }
-
-  return (
-    <section className="workspace-card" aria-labelledby="workspace-title">
-      <header className="workspace-header">
-        <div>
-          <h1 className="title" id="workspace-title">
-            {selectedTeam?.name ?? "工作台"}
-          </h1>
-          <p className="member-name">{member.email}</p>
-        </div>
-        <a href="/account">账号设置</a>
-        <button className="button secondary" onClick={signOut} disabled={pending}>
-          退出登录
-        </button>
-      </header>
-
-      {workspace.teams.length === 0 || showTeamForm ? (
-        <form className="fields" onSubmit={createTeam}>
-          <label className="field">
-            队伍名称
-            <input
-              name="teamName"
-              value={teamName}
-              onChange={(event) => setTeamName(event.target.value)}
-              required
-            />
-          </label>
-          <button className="button" type="submit" disabled={busy}>
-            创建队伍
-          </button>
-          {workspace.teams.length > 0 && (
-            <button
-              className="button secondary"
-              type="button"
-              onClick={() => setShowTeamForm(false)}
-              disabled={busy}
-            >
-              取消
-            </button>
-          )}
-        </form>
-      ) : (
-        <>
-          <div className="workspace-toolbar">
-            <label className="field">
-              当前队伍
-              <select
-                value={workspace.selectedTeamId ?? undefined}
-                onChange={(event) => switchTeam(event.target.value)}
-                disabled={busy}
-              >
-                {workspace.teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p className="role">{selectedTeam?.role === "owner" ? "队长" : "队员"}</p>
-            <button
-              className="button secondary"
-              type="button"
-              onClick={() => setShowTeamForm(true)}
-              disabled={busy}
-            >
-              新建队伍
-            </button>
-          </div>
-
-          {selectedTeam && (
-            <TeamManagement
-              key={selectedTeam.id}
-              teamId={selectedTeam.id}
-              role={selectedTeam.role}
-              invitationUrl={invitationUrl}
-              onInvitationChange={setInvitationUrl}
-              onTeamChanged={() => void loadWorkspace()}
-            />
-          )}
-
-          <form className="inline-form" onSubmit={createContest}>
-            <label className="field">
-              比赛名称
-              <input
-                name="contestName"
-                value={contestName}
-                onChange={(event) => setContestName(event.target.value)}
-                required
-              />
-            </label>
-            <button className="button" type="submit" disabled={busy}>
-              创建比赛
-            </button>
-          </form>
-
-          <ul className="contest-list" aria-label="比赛">
-            {workspace.contests.map((contest) => (
-              <li key={contest.id}>
-                <a className="contest-link" href={`/contest/${contest.id}`}>
-                  {contest.name}
-                </a>
-                <span>{formatTimestamp(contest.createdAt)}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      {displayedError && (
-        <p className="error" role="alert">
-          {displayedError}
-        </p>
-      )}
-    </section>
-  );
+  return <div onClick={follow}>
+    {navigation}
+    {message && <p role="alert" className="workspace-alert vp-error">{message}</p>}
+    {match ? contestView() : <div className="vp-layout">
+      <Sidebar path={path} name={member.name} email={member.email} signOut={signOut} pending={pending}/>
+      <main className="vp-main">{workspaceView()}</main>
+    </div>}
+    <CreateTeamDialog dialog={dialog} create={createTeam}/>
+  </div>;
 }

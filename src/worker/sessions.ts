@@ -5,6 +5,16 @@ import { createAuth } from "./auth";
 
 export const sessionRoutes = new Hono<{ Bindings: Environment }>();
 
+sessionRoutes.get("/account/password", async c => {
+  const identity = await createAuth(c.env).api.getSession({ headers: c.req.raw.headers });
+  if (!identity) return c.json({ error: "authentication required" }, 401);
+  const credential = await c.env.DB.prepare(`
+    SELECT 1 FROM account
+    WHERE userId = ? AND providerId = 'credential' AND password IS NOT NULL
+  `).bind(identity.user.id).first();
+  return c.json({ hasPassword: Boolean(credential) });
+});
+
 sessionRoutes.get("/account/sessions", async c => {
   const auth = createAuth(c.env);
   const headers = c.req.raw.headers;

@@ -309,6 +309,102 @@ test("a new mailbox owner can use an email OTP as the first sign-in method", asy
   );
   expect(noPassword.status).toBe(401);
   expect(cookies(noPassword)).toBe("");
+
+  const passwordStatus = await worker.fetch(
+    request("/api/account/password", { headers: { cookie: cookies(signIn) } }),
+    emailBinding,
+  );
+  expect(passwordStatus.status).toBe(200);
+  expect(await passwordStatus.json()).toEqual({ hasPassword: false });
+});
+
+test("a member can change a password and revoke other web sessions", async () => {
+  const email = crypto.randomUUID() + "@vprint.example";
+  const password = "correct horse battery staple";
+  const post = (path: string, data: object, cookie = "") => worker.fetch(request(path, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: loopbackOrigin, cookie },
+    body: JSON.stringify(data),
+  }), env);
+
+  const first = await post("/api/auth/sign-up/email", { email, password, name: "密码队员" });
+  expect(first.ok).toBe(true);
+  const firstCookie = cookies(first);
+  const second = await post("/api/auth/sign-in/email", { email, password });
+  expect(second.ok).toBe(true);
+  const secondCookie = cookies(second);
+
+  const before = await worker.fetch(request("/api/account/password", { headers: { cookie: secondCookie } }), env);
+  expect(await before.json()).toEqual({ hasPassword: true });
+  const wrong = await post("/api/auth/change-password", {
+    currentPassword: "not the password",
+    newPassword: "updated horse battery staple",
+    revokeOtherSessions: true,
+  }, secondCookie);
+  expect(wrong.status).toBe(400);
+
+  const changed = await post("/api/auth/change-password", {
+    currentPassword: password,
+    newPassword: "updated horse battery staple",
+    revokeOtherSessions: true,
+  }, secondCookie);
+  expect(changed.ok).toBe(true);
+  expect(await (await worker.fetch(request("/api/me", { headers: { cookie: firstCookie } }), env)).status).toBe(401);
+  expect(await (await worker.fetch(request("/api/me", { headers: { cookie: cookies(changed) || secondCookie } }), env)).status).toBe(200);
+  await expect(post("/api/auth/sign-in/email", { email, password: "updated horse battery staple" })).resolves.toMatchObject({ ok: true });
+});
+
+test("an email OTP can reset a password or set the first password without creating users", async () => {
+  const messages: EmailMessage[] = [];
+  const emailBinding = { ...env, EMAIL: { send: async (message: EmailMessage) => messages.push(message) } };
+  const email = crypto.randomUUID() + "@vprint.example";
+  const post = (path: string, data: object) => worker.fetch(request(path, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: loopbackOrigin },
+    body: JSON.stringify(data),
+  }), emailBinding);
+  const lastOtp = () => messages.at(-1)?.text.match(/\b\d{6}\b/)?.[0];
+  const unknown = crypto.randomUUID() + "@vprint.example";
+
+  const unknownRequest = await post("/api/auth/email-otp/request-password-reset", { email: unknown });
+  expect(unknownRequest.ok).toBe(true);
+  expect(messages).toHaveLength(0);
+  const unknownReset = await post("/api/auth/email-otp/reset-password", { email: unknown, otp: "000000", password: "recovered horse battery staple" });
+  expect(unknownReset.ok).toBe(false);
+  expect(await env.DB.prepare("SELECT id FROM user WHERE email = ?").bind(unknown).first()).toBeNull();
+
+  const registered = await post("/api/auth/sign-up/email", {
+    email,
+    password: "correct horse battery staple",
+    name: "重置密码队员",
+  });
+  expect(registered.ok).toBe(true);
+  expect((await post("/api/auth/email-otp/request-password-reset", { email })).ok).toBe(true);
+  expect(messages.at(-1)?.subject).toBe("VPrint 重置密码验证码");
+  expect((await post("/api/auth/email-otp/reset-password", {
+    email,
+    otp: lastOtp() === "000000" ? "000001" : "000000",
+    password: "recovered horse battery staple",
+  })).status).toBe(400);
+  expect((await post("/api/auth/email-otp/reset-password", {
+    email,
+    otp: lastOtp(),
+    password: "recovered horse battery staple",
+  })).ok).toBe(true);
+  const previousSession = await worker.fetch(request("/api/me", { headers: { cookie: cookies(registered) } }), emailBinding);
+  expect(previousSession.status).toBe(401);
+  await expect(post("/api/auth/sign-in/email", { email, password: "recovered horse battery staple" })).resolves.toMatchObject({ ok: true });
+
+  const otpOnly = crypto.randomUUID() + "@vprint.example";
+  await post("/api/auth/email-otp/send-verification-otp", { email: otpOnly, type: "sign-in" });
+  const otpOnlySignIn = await post("/api/auth/sign-in/email-otp", { email: otpOnly, otp: lastOtp(), name: "验证码队员" });
+  expect(otpOnlySignIn.ok).toBe(true);
+  const cookie = cookies(otpOnlySignIn);
+  const withoutPassword = await worker.fetch(request("/api/account/password", { headers: { cookie } }), emailBinding);
+  expect(await withoutPassword.json()).toEqual({ hasPassword: false });
+  expect((await post("/api/auth/email-otp/request-password-reset", { email: otpOnly })).ok).toBe(true);
+  expect((await post("/api/auth/email-otp/reset-password", { email: otpOnly, otp: lastOtp(), password: "first horse battery staple" })).ok).toBe(true);
+  await expect(post("/api/auth/sign-in/email", { email: otpOnly, password: "first horse battery staple" })).resolves.toMatchObject({ ok: true });
 });
 
 test("binding an existing account with an email code cannot register a new account", async () => {

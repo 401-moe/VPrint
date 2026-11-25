@@ -67,6 +67,10 @@ async function join(cookie: string, token: string) {
   }), env);
 }
 
+async function previewInvitation(cookie: string, token: string) {
+  return worker.fetch(request(`/api/team-invitations/${token}`, { headers: { cookie } }), env);
+}
+
 async function workspace(cookie: string, contestId?: string) {
   return worker.fetch(
     request(`/api/workspace${contestId ? `?contestId=${contestId}` : ""}`, {
@@ -178,6 +182,19 @@ test("two members can reuse one invitation and keep team-specific roles", async 
   expect(token).toMatch(/^[a-f0-9]{32}$/);
   expect(body.invitationUrl).toBe(`${loopbackOrigin}/invite/${token}`);
 
+  const anonymousPreview = await worker.fetch(request(`/api/team-invitations/${token}`), env);
+  expect(anonymousPreview.status).toBe(401);
+  expect(await anonymousPreview.json()).toEqual({ error: "authentication required" });
+
+  const outsider = await signUp({
+    email: `preview-outsider-${Date.now()}@vprint.example`,
+    password: "correct horse battery staple",
+    name: "预览队友",
+  });
+  const outsiderPreview = await previewInvitation(outsider.cookie, token);
+  expect(outsiderPreview.status).toBe(200);
+  expect(((await outsiderPreview.json()) as { joined: boolean }).joined).toBe(false);
+
   const anonymousJoin = await join("", token);
   expect(anonymousJoin.status).toBe(401);
 
@@ -196,6 +213,18 @@ test("two members can reuse one invitation and keep team-specific roles", async 
 
   const duplicateJoin = await join(firstCookie, token);
   expect(duplicateJoin.status).toBe(200);
+
+  const memberPreview = await previewInvitation(firstCookie, token);
+  expect(memberPreview.status).toBe(200);
+  expect(await memberPreview.json()).toEqual({
+    teamId: body.id,
+    teamName: "火苗",
+    ownerName: "建队队员",
+    memberCount: 3,
+    contestCount: 0,
+    printoutCount: 0,
+    joined: true,
+  });
 
   const missingJoin = await join(
     firstCookie,
@@ -261,6 +290,12 @@ test("same-named contests have independent ids and appear newest first", async (
   expect(secondContest.id).not.toBe(firstContest.id);
   expect(secondContest.createdAt).toBeGreaterThanOrEqual(firstContest.createdAt);
 
+  const ownerId = await userId(ownerCookie);
+  const printIds = [crypto.randomUUID(), crypto.randomUUID()].sort();
+  for (const id of printIds) {
+    await insertPrintout({ id, contestId: firstContest.id, userId: ownerId, requestId: crypto.randomUUID(), filename: "A.cpp" });
+  }
+
   const listed = await workspace(memberCookie);
   const listBody = (await listed.json()) as {
     selectedTeamId: string;
@@ -271,6 +306,9 @@ test("same-named contests have independent ids and appear newest first", async (
     secondContest.id,
     firstContest.id,
   ]);
+  expect(listBody.contests[0]).toMatchObject({ printCount: 0, latestPrintId: null, latestFilename: null, latestPrintAt: null });
+  expect(listBody.contests[1]).toMatchObject({ printCount: 2, latestPrintId: printIds[1], latestFilename: "A.cpp", latestPrintAt: 1000 });
+  expect(listBody.contests[1]).not.toHaveProperty("content");
 });
 
 test("workspace restores the last accessible team and contest links take priority", async () => {
@@ -403,6 +441,13 @@ test("only the owner resets an invitation, and existing members keep their roles
 
   const oldJoin = await join(memberCookie, team.invitationToken);
   expect(oldJoin.status).toBe(404);
+  const oldPreview = await previewInvitation(memberCookie, team.invitationToken);
+  expect(oldPreview.status).toBe(404);
+  const memberPreview = await previewInvitation(
+    memberCookie,
+    resetBody.invitationToken,
+  );
+  expect(((await memberPreview.json()) as { joined: boolean }).joined).toBe(true);
   const ownerWorkspace = await workspace(ownerCookie);
   const ownerBody = (await ownerWorkspace.json()) as {
     teams: { id: string; role: string; invitationUrl: string }[];
