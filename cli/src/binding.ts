@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function bindDirectory(contestId: string, directory = process.cwd()) {
-  if (!uuid.test(contestId)) throw new Error("比赛标识无效。");
+  if (!uuidPattern.test(contestId)) throw new Error("比赛标识无效。");
   const target = join(directory, ".vprint");
   const temp = target + "." + randomUUID();
   try {
@@ -28,7 +28,7 @@ export async function findContest(start = process.cwd()): Promise<string> {
     if (raw !== undefined) {
       try {
         const id = JSON.parse(raw)?.contestId;
-        if (typeof id === "string" && uuid.test(id)) return id;
+        if (typeof id === "string" && uuidPattern.test(id)) return id;
       } catch { /* Report the binding path for malformed JSON too. */ }
       throw new Error(file + " 内容无效，请在该目录重新运行 vprint use。");
     }

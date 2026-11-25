@@ -153,6 +153,23 @@ test("team members can list printout metadata and open a separate body detail", 
   expect(await detail.json()).toMatchObject({ filename: "A.cpp", content: "return 0;\r\n" });
 });
 
+test("a CLI member can preview the bound contest, other users cannot read it", async () => {
+  const suffix = crypto.randomUUID();
+  const { memberCookie, contest } = await fixture({
+    ownerEmail: `preview-owner-${suffix}@vprint.example`,
+    memberEmail: `preview-member-${suffix}@vprint.example`,
+    contestName: "确认训练",
+  });
+  const path = "/api/cli/contests/" + contest.id;
+  const memberCli = await authorizeTestDevice(memberCookie);
+  const result = await memberCli.send(request(path));
+  expect(result.status).toBe(200);
+  expect(await result.json()).toEqual({ teamName: "火苗", name: "确认训练", createdAt: contest.createdAt });
+  const stranger = await authorizeTestDevice(await signUp(`preview-stranger-${suffix}@vprint.example`));
+  expect((await stranger.send(request(path))).status).toBe(403);
+  expect((await worker.fetch(request(path), env)).status).toBe(401);
+});
+
 test("the same idempotency key returns the original receipt without a second row", async () => {
   const suffix = crypto.randomUUID();
   const { ownerCookie, contest } = await fixture({

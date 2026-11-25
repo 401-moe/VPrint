@@ -1,7 +1,10 @@
 import { hostname } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
+import type { Key } from "node:readline";
+import { spinner } from "@clack/prompts";
+import { interactive, report } from "./terminal.ts";
 import * as oauth from "oauth4webapi";
-import { clearCredentials, readCredentials, withCredentialLock, writeCredentials, type Credentials } from "./state.ts";
+import { clearCredentials, readCredentials, readCredentialsIfPresent, withCredentialLock, writeCredentials, type Credentials } from "./state.ts";
 
 const base = new URL(process.env.VPRINT_URL || "https://vprint.401.moe");
 if (base.username || base.password || base.search || base.hash || base.pathname !== "/") throw new Error("VPRINT_URL 应为 VPrint 服务的源地址。");
@@ -63,8 +66,16 @@ async function currentSession() {
 }
 
 export async function apiRequest(path: string, method = "GET", headers?: Headers, body?: oauth.ProtectedResourceRequestBody) {
-  const session = await currentSession();
-  return resourceRequest(await handle(session), session.accessToken, path, method, headers, body);
+  try {
+    const session = await currentSession();
+    const response = await resourceRequest(await handle(session), session.accessToken, path, method, headers, body);
+    if (response.status !== 401) return response;
+  } catch (error) {
+    const expired = error instanceof oauth.ResponseBodyError && error.error === "invalid_grant";
+    const unauthorized = error instanceof oauth.WWWAuthenticateChallengeError && error.response.status === 401;
+    if (!expired && !unauthorized) throw error;
+  }
+  throw new Error("本机登录已失效，请重新运行 vprint login。");
 }
 
 export async function login() {
@@ -76,27 +87,54 @@ export async function login() {
     }));
   const verification = new URL(device.verification_uri);
   if (verification.origin !== origin) throw new Error("设备授权网址与当前 VPrint 服务不一致。");
-  console.log("请打开 " + verification.href + "，核对并输入短码 " + device.user_code + "。");
+  report("info", `请在浏览器打开 ${verification.href}\n输入终端短码 ${device.user_code}`);
+  const waiting = "等待浏览器授权";
+  const cancelled = "已取消登录。";
+  const progress = interactive ? spinner({
+    withGuide: false, cancelMessage: cancelled, onCancel: () => process.exit(130),
+  }) : undefined;
+  // Clack's raw-mode blocker otherwise exits successfully on a cancel key.
+  const cancelKey = (_text: string, key: Key) => {
+    if ((key.ctrl && key.name === "c") || key.name === "escape") {
+      progress?.cancel(cancelled);
+      process.exit(130);
+    }
+  };
+  let tokens: oauth.TokenEndpointResponse;
+  try {
+    report("info", progress ? waiting + "（Ctrl+C 取消）" : waiting + "…");
+    if (progress) {
+      // Keep the instructions above the row Clack clears on every frame.
+      progress.start();
+      process.stdin.prependListener("keypress", cancelKey);
+    }
+    tokens = await pollForApproval(device, key);
+  } finally {
+    process.stdin.off("keypress", cancelKey);
+    progress?.clear();
+  }
+  const fields = tokenFields(tokens);
+  const response = await resourceRequest(key, fields.accessToken, "/api/cli/me", "GET");
+  if (!response.ok) throw new Error("未能确认已登录账号。");
+  const user = await response.json() as { email: string };
+  if (!user.email) throw new Error("服务端未返回账号邮箱。");
+  const privateKey = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
+  const publicKey = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+  await withCredentialLock(() => writeCredentials({ version: 1, origin, privateKey, publicKey, ...fields }));
+  report("success", "已登录 " + user.email);
+}
+
+async function pollForApproval(device: oauth.DeviceAuthorizationResponse, key: oauth.DPoPHandle) {
   const deadline = Date.now() + device.expires_in * 1000;
   let interval = Math.max(1, device.interval ?? 5) * 1000;
   while (Date.now() < deadline) {
     await delay(Math.min(interval, deadline - Date.now()));
     if (Date.now() >= deadline) break;
     try {
-      const tokens = await retryNonce(async () => oauth.processDeviceCodeResponse(as, client,
+      return await retryNonce(async () => oauth.processDeviceCodeResponse(as, client,
         await oauth.deviceCodeGrantRequest(as, client, clientAuth, device.device_code, {
           ...transport, DPoP: key, additionalParameters: { resource },
         })));
-      const fields = tokenFields(tokens);
-      const response = await resourceRequest(key, fields.accessToken, "/api/cli/me", "GET");
-      if (!response.ok) throw new Error("未能确认已登录账号。");
-      const user = await response.json() as { email: string };
-      if (!user.email) throw new Error("服务端未返回账号邮箱。");
-      const privateKey = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
-      const publicKey = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
-      await withCredentialLock(() => writeCredentials({ version: 1, origin, privateKey, publicKey, ...fields }));
-      console.log("已登录 " + user.email);
-      return;
     } catch (error) {
       if (!(error instanceof oauth.ResponseBodyError)) throw error;
       if (error.error === "authorization_pending") continue;
@@ -110,8 +148,9 @@ export async function login() {
 }
 
 export async function logout() {
-  await withCredentialLock(async () => {
-    const stored = await readCredentials(origin);
+  const loggedOut = await withCredentialLock(async () => {
+    const stored = await readCredentialsIfPresent(origin);
+    if (!stored) return false;
     try {
       const session = await refreshUnderLock(stored);
       const response = await resourceRequest(await handle(session), session.accessToken, "/api/cli/logout", "POST");
@@ -122,6 +161,7 @@ export async function logout() {
       if (!expired && !revoked) throw error;
     }
     await clearCredentials();
+    return true;
   });
-  console.log("已退出本机登录。");
+  report(loggedOut ? "success" : "info", loggedOut ? "已退出本机登录。" : "本机当前未登录。");
 }

@@ -101,6 +101,21 @@ printoutsRoutes.get("/cli/teams/:teamId/contests", async (context) => {
   return context.json({ contests: contests.results });
 });
 
+printoutsRoutes.get("/cli/contests/:contestId", async (context) => {
+  const identity = await requireCliIdentity(context, ["vprint:teams:read"]);
+  if (!identity) return context.json({ error: "authentication required" }, 401);
+  const contest = await context.env.DB.prepare(`
+    SELECT contest.name, contest.createdAt, team.name AS teamName
+    FROM contest
+    JOIN team ON team.id = contest.teamId
+    JOIN team_member ON team_member.teamId = team.id
+    WHERE contest.id = ? AND team_member.userId = ?
+  `).bind(context.req.param("contestId"), identity.user.id)
+    .first<{ name: string; createdAt: number; teamName: string }>();
+  if (!contest) return context.json({ error: "contest not found" }, 403);
+  return context.json(contest);
+});
+
 printoutsRoutes.post("/cli/contests/:contestId/prints", async (context) => {
   const contestId = context.req.param("contestId");
   const identity = await requireCliIdentity(context, ["vprint:print"]);
