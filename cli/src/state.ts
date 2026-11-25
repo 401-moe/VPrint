@@ -24,16 +24,22 @@ function configDir() {
 const directory = configDir();
 const file = join(directory, "session.json");
 
-export async function readCredentials(origin: string): Promise<Credentials> {
+export async function readCredentialsIfPresent(origin: string): Promise<Credentials | undefined> {
   let contents;
   try {
     contents = await readFile(file, "utf8");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new Error("请先运行 vprint login。");
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw error;
   }
   const session: Credentials = JSON.parse(contents);
   if (session.version !== 1 || session.origin !== origin) throw new Error("请为当前 VPrint 服务运行 vprint login。");
+  return session;
+}
+
+export async function readCredentials(origin: string) {
+  const session = await readCredentialsIfPresent(origin);
+  if (!session) throw new Error("请先运行 vprint login。");
   return session;
 }
 

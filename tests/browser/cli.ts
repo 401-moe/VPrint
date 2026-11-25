@@ -11,7 +11,6 @@ export interface CliProcess {
   child: ChildProcess;
   output: () => string;
   done: Promise<number | null>;
-  write: (input: string) => Promise<void>;
   stop: () => void;
 }
 
@@ -34,7 +33,7 @@ export function runCli(
   const child = spawn(binary || process.execPath, binary ? args : [entry, ...args], {
     cwd: directory,
     env: { ...process.env, VPRINT_URL: origin, VPRINT_CONFIG_DIR: credentials },
-    stdio: ["pipe", "pipe", "pipe"],
+    stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
   child.stdout.on("data", chunk => { output += chunk; });
@@ -51,9 +50,6 @@ export function runCli(
     child,
     output: () => output,
     done,
-    write: input => new Promise((resolveWrite, rejectWrite) => {
-      child.stdin.write(input, error => error ? rejectWrite(error) : resolveWrite());
-    }),
     stop: () => {
       if (child.exitCode === null && !child.killed) child.kill();
     },

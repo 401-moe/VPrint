@@ -49,6 +49,8 @@ test("a denied device request shows the public code and saves no credentials", a
   assert.notEqual(result.code, 0);
   assert.match(result.output, /ABCD-EFGH/);
   assert.match(result.output, /拒绝/);
+  assert.equal(result.output.match(/等待浏览器授权/g)?.length, 1);
+  assert.ok(!result.output.includes("\x1b"));
   assert.ok(result.output.includes(origin + "/device"));
   assert.ok(!result.output.includes("keep-this-device-code-private"));
   assert.deepEqual(paths, ["/api/auth/device/code", "/api/auth/oauth2/token"]);
@@ -86,6 +88,9 @@ test("login, refresh in a new process, and logout use the same key and distinct 
   if (process.platform !== "win32") assert.equal((await stat(join(dir, "session.json"))).mode & 0o777, 0o600);
   const loggedOut = await run(["logout"], env);
   assert.equal(loggedOut.code, 0, loggedOut.output);
+  const alreadyLoggedOut = await run(["logout"], env);
+  assert.equal(alreadyLoggedOut.code, 0, alreadyLoggedOut.output);
+  assert.match(alreadyLoggedOut.output, /本机当前未登录/);
   assert.deepEqual(await readdir(dir), []);
   assert.deepEqual(seen.map(r => r.route), ["/api/auth/device/code", "/api/auth/oauth2/token", "/api/cli/me", "/api/auth/oauth2/token", "/api/cli/logout"]);
   assert.ok(seen[0].headers["x-vprint-hostname"]);

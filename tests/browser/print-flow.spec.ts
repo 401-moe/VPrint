@@ -39,13 +39,12 @@ test("a member authorizes a real CLI and reads its print on phones and desktops"
     expect(await login.done).toBe(0);
     expect(login.output()).toContain("已登录 ");
 
-    const use = runCli(["use"], workspace.directory, baseURL!, workspace.credentials);
+    const use = runCli(["use", "--team", name, "--contest", name], workspace.directory, baseURL!, workspace.credentials);
     activeCli.push(use);
-    await use.write("1\n");
     expect(await use.done).toBe(0);
     expect(use.output()).toContain("已绑定 " + name + " / " + name);
     async function printCli(filename: string) {
-      const printed = runCli([filename], workspace.directory, baseURL!, workspace.credentials);
+      const printed = runCli(["--yes", filename], workspace.directory, baseURL!, workspace.credentials);
       activeCli.push(printed);
       expect(await printed.done, printed.output()).toBe(0);
       expect(printed.output()).toContain(filename + " 已打印");

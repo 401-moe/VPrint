@@ -15,6 +15,12 @@ pnpm run dev
 
 启动 Wrangler 前，在本机的 `.dev.vars` 中设置 `BETTER_AUTH_URL=http://127.0.0.1:8787` 和 `BETTER_AUTH_SECRET`。后者使用本地独立生成的随机值，例如用 `openssl rand -hex 32` 生成。浏览器打开 Wrangler 显示的地址即可使用本地数据库。
 
+## 在比赛目录打印
+
+运行 `vprint login` 授权本机，然后在训练目录运行 `vprint use` 选择队伍和比赛。在该目录或其子目录执行 `vprint A.cpp`，终端会显示当前比赛、当前时间、文件名、字节数和上次修改时间。看到 `确认打印？ [Y/n]` 后，按回车、`y` 或 `Y` 打印，按 `n` 或 `N` 取消。
+
+每次只接受一个文件。脚本使用 `vprint -y A.cpp` 或 `vprint A.cpp --yes`，同样会显示打印信息。
+
 ## 配置公开站点
 
 公开来源是 `https://vprint.401.moe`。Web 页面、CLI、邀请链接和设备码授权均使用这个来源。
