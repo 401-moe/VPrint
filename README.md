@@ -15,6 +15,8 @@ pnpm run dev
 
 启动 Wrangler 前，在本机的 `.dev.vars` 中设置 `BETTER_AUTH_URL=http://127.0.0.1:8787` 和 `BETTER_AUTH_SECRET`。后者使用本地独立生成的随机值，例如用 `openssl rand -hex 32` 生成。浏览器打开 Wrangler 显示的地址即可使用本地数据库。
 
+公开首页是 `index.html` 中的静态内容，GSAP 动画和本地打印演示由 `src/web/landing/` 渐进增强；关闭 JavaScript 或脚本加载失败时仍能阅读示例与开始步骤，交互控件只在初始化后显示。工作区入口使用同源 `/workspace`，预览不会跳转到生产站。首页演示不调用上传 API，动画支持减少动态效果偏好。
+
 ## 在比赛目录打印
 
 从 [GitHub Releases](https://github.com/vprint-ac/VPrint/releases) 下载对应系统的 CLI。从 `v0.1.0-rc.3` 起，CLI 默认连接 `https://vprint.ac`。原先已登录的比赛主机升级后，需要在新站重新授权一次。
