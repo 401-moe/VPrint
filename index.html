@@ -2,106 +2,253 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="VPrint 是 XCPC 训练用的电子打印机。比赛主机打印代码，队友在自己的设备上按行号阅读。" />
-    <title>VPrint · XCPC 训练电子打印机</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f6f6f4" />
+    <meta name="description" content="VPrint 是 XCPC 队内训练用的电子打印机。一行命令上传代码，队友在手机、平板或电脑上阅读同一份打印件，你在主机上继续做题。" />
+    <meta property="og:title" content="VPrint · XCPC 队内电子打印" />
+    <meta property="og:description" content="一行命令，把代码发给队友。大家各自阅读，你在主机上接着写。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://vprint.ac/" />
+    <meta property="og:locale" content="zh_CN" />
+    <link rel="canonical" href="https://vprint.ac/" />
+    <title>VPrint · XCPC 队内电子打印</title>
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any" />
+    <link rel="preload" href="/src/web/fonts/Geist.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/src/web/fonts/GeistMono.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/src/web/landing/page.css" />
+    <!-- Vite injects the built stylesheet later in head; keep the no-JS fallback authoritative. -->
+    <noscript><style>
+      .demo-run, .command button, .try-empty, .demo-status { display: none !important; }
+      .landing .try-received { opacity: 1 !important; visibility: visible !important; }
+      .start-reading-story { height: auto !important; }
+      .story-sticky { position: relative !important; top: 0 !important; }
+    </style></noscript>
   </head>
-  <body id="top">
-    <header class="top frame">
-      <a class="brand" href="#top" aria-label="VPrint 首页">
-        <img src="/favicon.svg" width="34" height="34" alt="" /><strong>VPrint</strong>
-      </a>
-      <nav aria-label="主导航">
-        <a href="#guide">使用方法</a>
-        <a href="https://github.com/vprint-ac/VPrint/releases">下载 CLI</a>
-      </nav>
-    </header>
-    <main>
-      <section class="paper-hero frame">
-        <div class="paper-copy">
-          <h1>把代码<br />递给队友。</h1>
-          <p class="lead">VPrint 是 XCPC 训练用的电子打印机。主机发出代码，队友就能在自己的屏幕上按行号一起看。</p>
-          <a class="cta" href="/login">进入训练工作区 <span aria-hidden="true">→</span></a>
-          <a class="sample-link" href="#sample">试读打印件 <span aria-hidden="true">↓</span></a>
+  <body>
+    <div class="landing" id="top">
+      <header class="lp-header">
+        <div class="lp-wrap header-inner">
+          <a class="lp-brand" href="#top" aria-label="VPrint 首页"><svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-printer" aria-hidden="true"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"></path><rect x="6" y="14" width="12" height="8" rx="1"></rect></svg><span>VPrint</span></a>
+          <nav aria-label="主导航">
+            <a href="#shared-reading">阅读体验</a><a href="#start">如何开始</a><a class="lp-button" href="/workspace">进入工作区</a>
+          </nav>
         </div>
-        <figure class="printer-figure">
-          <img width="1120" height="747" fetchpriority="high" src="/src/web/landing/printer.webp" alt="针式打印机吐出一张带代码的连续打印纸" />
-          <figcaption><code>vprint A.cpp</code><span>终端 → 队友的屏幕</span></figcaption>
-        </figure>
-      </section>
-      <section id="sample" class="sample frame" aria-labelledby="sample-title">
-        <header class="sample-heading">
-          <h2 id="sample-title">队友收到的打印件</h2>
-          <p>你在主机上继续写，队友可以拿着手机，按行号读刚才打印的代码。</p>
-        </header>
-        <article class="listing" aria-labelledby="sample-file">
-          <div class="listing-info">
-            <h3 id="sample-file">A.cpp</h3>
-            <p>C++ · 8 行</p>
-            <dl>
-              <div><dt>示例比赛</dt><dd>周六训练</dd></div>
-              <div><dt>打印时间</dt><dd><time>14:32:08</time></dd></div>
-            </dl>
-          </div>
-          <div class="source" tabindex="0" role="region" aria-label="A.cpp 示例源码">
-            <span class="numbers" aria-hidden="true">1
-2
-3
-4
-5
-6
-7
-8</span>
-            <pre><code><b>int</b> gcd(<b>int</b> a, <b>int</b> b) {
-    <b>while</b> (b) {
-        <b>int</b> r = a % b;
-        a = b;
-        b = r;
-    }
-    <b>return</b> a;
-}</code></pre>
-          </div>
-        </article>
-      </section>
-      <section class="guide frame" id="guide" aria-labelledby="guide-title">
-        <div class="guide-heading">
-          <div>
-            <h2 id="guide-title">开始一场训练</h2>
-            <p>先在工作区创建或加入队伍，建好比赛。接下来，只需在训练目录里操作。</p>
-          </div>
-          <a class="text-link" href="https://github.com/vprint-ac/VPrint/releases">下载命令行工具 <span aria-hidden="true">→</span></a>
-        </div>
-        <div class="walkthrough">
-          <div class="instruction">
-            <h3>授权主机，选定比赛</h3>
-            <p>打开终端给出的网址确认短码，再选这次训练的队伍和比赛。</p>
-            <div class="transcript">
-              <pre><code>$ vprint login</code></pre>
-              <p>请在浏览器打开 https://vprint.ac/device<br />等待浏览器授权…<br />已登录 team@example.org</p>
-              <pre><code>$ vprint use</code></pre>
-              <p>已绑定 校队 / 周六训练</p>
+      </header>
+      <main>
+        <section class="lp-wrap start-hero" aria-labelledby="hero-title">
+          <div class="start-hero-copy">
+            <p class="eyebrow">
+              XCPC 队内电子打印
+            </p>
+            <h1 id="hero-title">
+              <span class="start-title-line">少一次传文件。</span><span class="start-title-line quiet-word">多一个人想题。</span>
+            </h1>
+            <p class="lead">
+              一行命令，把代码发给队友。<br/>大家各自阅读，你在主机上接着写。
+            </p>
+            <div class="start-hero-actions">
+              <a class="lp-button" href="/workspace">开始一场训练</a>
             </div>
           </div>
-          <div class="instruction">
-            <h3>打印当前文件</h3>
-            <p>核对比赛和文件名，按回车发送。队友能在比赛列表看到新打印件。</p>
-            <div class="transcript">
-              <pre><code>$ vprint A.cpp</code></pre>
-              <p>当前比赛　校队 / 周六训练<br />文件名　　A.cpp<br />文件大小　115 字节</p>
-              <p>确认打印？ [Y/n]<br />A.cpp 已打印　14:32:08</p>
+          <div class="start-demo-perspective">
+            <div class="start-demo-intro">
+              <div class="try-panel" id="experience" data-phase="idle">
+                <div class="demo-topline">
+                  <span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-terminal" aria-hidden="true"><path d="M12 19h8"></path><path d="m4 17 6-6-6-6"></path></svg>比赛主机</span><span>周六训练</span>
+                </div>
+                <div class="try-workspace">
+                  <div class="demo-command">
+                    <code><span aria-hidden="true">$</span> vprint A.cpp</code><button disabled type="button" class="demo-run" aria-label="运行打印演示">运行<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-corner-down-left" aria-hidden="true"><path d="M20 4v7a4 4 0 0 1-4 4H4"></path><path d="m9 10-5 5 5 5"></path></svg></button>
+                  </div>
+                </div>
+                <div class="try-receiver">
+                  <div class="try-receiver-heading">
+                    <span>队友的屏幕</span><span class="demo-status" role="status"><svg class="delivery-check" hidden aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m20 6-11 11-5-5"></path></svg><span data-print-status>待接收</span></span>
+                  </div>
+                  <div class="try-receiver-body">
+                    <div class="try-empty" aria-hidden="false">
+                      <p>
+                        运行命令，代码就会出现在这里。
+                      </p>
+                    </div>
+                    <div class="try-received">
+                      <article class="reader-window desktop" aria-label="队友的电脑阅读演示">
+                        <div class="reader-nav">
+                          <span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-printer" aria-hidden="true"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"></path><rect x="6" y="14" width="12" height="8" rx="1"></rect></svg> VPrint</span><span class="reader-breadcrumb"> / 周六训练</span><span class="demo-label">演示</span>
+                        </div>
+                        <div class="reader-title">
+                          <div>
+                            <span class="paper-tag">打印件</span>
+                            <h3>
+                              A.cpp
+                            </h3>
+                          </div>
+                          <span class="reader-time">14:32:08</span>
+                        </div>
+                        <div class="demo-code" tabindex="0" role="region" aria-label="A.cpp 示例代码">
+                          <pre><code><span class="code-line"><span class="line-number" aria-hidden="true">1</span><span><b>int</b> bfs(<b>int</b> start, <b>int</b> target) {</span></span><span class="code-line"><span class="line-number" aria-hidden="true">2</span><span>    <b>queue</b>&lt;<b>int</b>&gt; q;</span></span><span class="code-line"><span class="line-number" aria-hidden="true">3</span><span>    q.push(start);</span></span><span class="code-line"><span class="line-number" aria-hidden="true">4</span><span>    dist[start] = <i>0</i>;</span></span><span class="code-line"><span class="line-number" aria-hidden="true">5</span><span></span></span><span class="code-line"><span class="line-number" aria-hidden="true">6</span><span>    <b>while</b> (!q.empty()) {</span></span><span class="code-line"><span class="line-number" aria-hidden="true">7</span><span>        <b>int</b> u = q.front(); q.pop();</span></span><span class="code-line"><span class="line-number" aria-hidden="true">8</span><span>        <b>if</b> (u == target) <b>return</b> dist[u];</span></span><span class="code-line"><span class="line-number" aria-hidden="true">9</span><span>        <b>for</b> (<b>int</b> v : graph[u]) {</span></span><span class="code-line"><span class="line-number" aria-hidden="true">10</span><span>            <b>if</b> (dist[v] != -<i>1</i>) <b>continue</b>;</span></span><span class="code-line"><span class="line-number" aria-hidden="true">11</span><span>            dist[v] = dist[u] + <i>1</i>;</span></span><span class="code-line"><span class="line-number" aria-hidden="true">12</span><span>            q.push(v);</span></span><span class="code-line"><span class="line-number" aria-hidden="true">13</span><span>        }</span></span><span class="code-line"><span class="line-number" aria-hidden="true">14</span><span>    }</span></span><span class="code-line"><span class="line-number" aria-hidden="true">15</span><span>    <b>return</b> -<i>1</i>;</span></span><span class="code-line"><span class="line-number" aria-hidden="true">16</span><span>}</span></span></code></pre>
+                        </div>
+                      </article>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
-    </main>
-    <footer class="bottom frame">
-      <a class="brand" href="#top" aria-label="VPrint 回到页首">
-        <img src="/favicon.svg" width="34" height="34" alt="" /><strong>VPrint</strong>
-      </a>
-      <a href="https://github.com/vprint-ac/VPrint">GitHub ↗</a>
-    </footer>
+        </section>
+        <section class="start-reading-story" id="shared-reading" aria-labelledby="reading-title">
+          <div class="lp-wrap story-sticky">
+            <div class="story-heading">
+              <h2 id="reading-title">
+                一台主机。<br/><span class="story-ink">三个人的思路。</span>
+              </h2>
+              <p>
+                电脑、平板或手机，<br/>打开比赛，就能读同一份代码。
+              </p>
+            </div>
+            <div class="spread-scene">
+              <div class="spread-terminal" aria-hidden="true" inert="">
+                <span class="scene-label">主机 · 继续写</span>
+                <div class="mini-terminal">
+                  <div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-terminal" aria-hidden="true"><path d="M12 19h8"></path><path d="m4 17 6-6-6-6"></path></svg><span>~/training</span>
+                  </div>
+                  <code><span>$ </span>vprint A.cpp</code>
+                  <p>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>已打印
+                  </p>
+                </div>
+              </div>
+              <div class="story-route" aria-hidden="true">
+                <span></span>
+              </div>
+              <div class="spread-desktop" aria-hidden="true" inert="">
+                <span class="scene-label">队友 · 电脑阅读</span>
+                <article class="reader-window desktop" aria-label="队友的电脑阅读演示">
+                  <div class="reader-nav">
+                    <span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-printer" aria-hidden="true"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"></path><rect x="6" y="14" width="12" height="8" rx="1"></rect></svg> VPrint</span><span class="reader-breadcrumb"> / 周六训练</span><span class="demo-label">演示</span>
+                  </div>
+                  <div class="reader-title">
+                    <div>
+                      <span class="paper-tag">打印件</span>
+                      <h3>
+                        A.cpp
+                      </h3>
+                    </div>
+                    <span class="reader-time">14:32:08</span>
+                  </div>
+                  <div class="demo-code" tabindex="0" role="region" aria-label="A.cpp 示例代码">
+                    <pre><code><span class="code-line"><span class="line-number" aria-hidden="true">1</span><span><b>int</b> bfs(<b>int</b> start, <b>int</b> target) {</span></span><span class="code-line"><span class="line-number" aria-hidden="true">2</span><span>    <b>queue</b>&lt;<b>int</b>&gt; q;</span></span><span class="code-line"><span class="line-number" aria-hidden="true">3</span><span>    q.push(start);</span></span><span class="code-line"><span class="line-number" aria-hidden="true">4</span><span>    dist[start] = <i>0</i>;</span></span><span class="code-line"><span class="line-number" aria-hidden="true">5</span><span></span></span><span class="code-line"><span class="line-number" aria-hidden="true">6</span><span>    <b>while</b> (!q.empty()) {</span></span><span class="code-line"><span class="line-number" aria-hidden="true">7</span><span>        <b>int</b> u = q.front(); q.pop();</span></span><span class="code-line"><span class="line-number" aria-hidden="true">8</span><span>        <b>if</b> (u == target) <b>return</b> dist[u];</span></span><span class="code-line"><span class="line-number" aria-hidden="true">9</span><span>        <b>for</b> (<b>int</b> v : graph[u]) {</span></span><span class="code-line"><span class="line-number" aria-hidden="true">10</span><span>            <b>if</b> (dist[v] != -<i>1</i>) <b>continue</b>;</span></span><span class="code-line"><span class="line-number" aria-hidden="true">11</span><span>            dist[v] = dist[u] + <i>1</i>;</span></span><span class="code-line"><span class="line-number" aria-hidden="true">12</span><span>            q.push(v);</span></span><span class="code-line"><span class="line-number" aria-hidden="true">13</span><span>        }</span></span><span class="code-line"><span class="line-number" aria-hidden="true">14</span><span>    }</span></span><span class="code-line"><span class="line-number" aria-hidden="true">15</span><span>    <b>return</b> -<i>1</i>;</span></span><span class="code-line"><span class="line-number" aria-hidden="true">16</span><span>}</span></span></code></pre>
+                  </div>
+                </article>
+              </div>
+              <div class="spread-phone" aria-hidden="true" inert="">
+                <span class="scene-label">队友 · 手机阅读</span>
+                <article class="reader-window phone" aria-label="队友的手机阅读演示">
+                  <div class="phone-top" aria-hidden="true">
+                    <span>14:32</span><span class="phone-speaker"></span><span>•••</span>
+                  </div>
+                  <div class="reader-nav">
+                    <span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-printer" aria-hidden="true"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"></path><rect x="6" y="14" width="12" height="8" rx="1"></rect></svg> VPrint</span><span class="reader-breadcrumb"> / 周六训练</span><span class="demo-label">演示</span>
+                  </div>
+                  <div class="reader-title">
+                    <div>
+                      <span class="paper-tag">打印件</span>
+                      <h3>
+                        A.cpp
+                      </h3>
+                    </div>
+                    <span class="reader-time">14:32:08</span>
+                  </div>
+                  <div class="demo-code compact" tabindex="0" role="region" aria-label="A.cpp 示例代码">
+                    <pre><code><span class="code-line"><span class="line-number" aria-hidden="true">1</span><span><b>int</b> bfs(<b>int</b> start, <b>int</b> target) {</span></span><span class="code-line"><span class="line-number" aria-hidden="true">2</span><span>    <b>queue</b>&lt;<b>int</b>&gt; q;</span></span><span class="code-line"><span class="line-number" aria-hidden="true">3</span><span>    q.push(start);</span></span><span class="code-line"><span class="line-number" aria-hidden="true">4</span><span>    dist[start] = <i>0</i>;</span></span><span class="code-line"><span class="line-number" aria-hidden="true">5</span><span></span></span><span class="code-line"><span class="line-number" aria-hidden="true">6</span><span>    <b>while</b> (!q.empty()) {</span></span><span class="code-line"><span class="line-number" aria-hidden="true">7</span><span>        <b>int</b> u = q.front(); q.pop();</span></span><span class="code-line"><span class="line-number" aria-hidden="true">8</span><span>        <b>if</b> (u == target) <b>return</b> dist[u];</span></span><span class="code-line"><span class="line-number" aria-hidden="true">9</span><span>        <b>for</b> (<b>int</b> v : graph[u]) {</span></span><span class="code-line"><span class="line-number" aria-hidden="true">10</span><span>            <b>if</b> (dist[v] != -<i>1</i>) <b>continue</b>;</span></span><span class="code-line"><span class="line-number" aria-hidden="true">11</span><span>            dist[v] = dist[u] + <i>1</i>;</span></span><span class="code-line"><span class="line-number" aria-hidden="true">12</span><span>            q.push(v);</span></span><span class="code-line"><span class="line-number" aria-hidden="true">13</span><span>        }</span></span><span class="code-line"><span class="line-number" aria-hidden="true">14</span><span>    }</span></span><span class="code-line"><span class="line-number" aria-hidden="true">15</span><span>    <b>return</b> -<i>1</i>;</span></span><span class="code-line"><span class="line-number" aria-hidden="true">16</span><span>}</span></span></code></pre>
+                  </div>
+                </article>
+              </div>
+              <div class="spread-notice">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+                <div>
+                  <strong>B.cpp 已送达</strong>
+                  <p>
+                    先读完这一段，新件等你。
+                  </p>
+                </div>
+              </div>
+            </div>
+            <p class="story-caption">
+              每次打印都是独立副本，本地修改不会打断队友的阅读。
+            </p>
+          </div>
+        </section>
+        <section id="start" class="lp-wrap start-guide" aria-labelledby="start-title">
+          <div class="guide-intro">
+            <p class="eyebrow">
+              开始使用
+            </p>
+            <h2 id="start-title">
+              设置一次，<br/>整场都顺手。
+            </h2>
+            <p>
+              建好队伍、选好比赛，<br/>之后每份代码，一行命令就够。
+            </p>
+            <div class="guide-actions">
+              <a class="lp-button" href="/workspace">开始一场训练</a><a class="text-link" href="https://github.com/vprint-ac/VPrint/releases">下载 CLI <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up-right" aria-hidden="true"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg></a>
+            </div>
+            <span class="platforms">macOS · Windows · Linux</span>
+          </div>
+          <ol class="guide-steps">
+            <li>
+              <span class="step-index">01</span>
+              <div>
+                <h3>
+                  建好队伍与比赛
+                </h3>
+                <p>
+                  在工作区创建队伍，把邀请链接发给队友。
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="step-index">02</span>
+              <div>
+                <h3>
+                  在主机登录，选好比赛
+                </h3>
+                <p>
+                  一个训练目录只需设置一次。
+                </p>
+                <div class="guide-commands">
+                  <div class="command light">
+                    <code><span aria-hidden="true">$ </span>vprint login</code><button disabled aria-label="复制 vprint login" title="复制命令"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button><span class="sr-only" role="status"></span>
+                  </div>
+                  <div class="command light">
+                    <code><span aria-hidden="true">$ </span>vprint use</code><button disabled aria-label="复制 vprint use" title="复制命令"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button><span class="sr-only" role="status"></span>
+                  </div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <span class="step-index">03</span>
+              <div>
+                <h3>
+                  发出代码，接着做题
+                </h3>
+                <p>
+                  队友打开比赛，就能看到新的打印件。
+                </p>
+                <div class="command light">
+                  <code><span aria-hidden="true">$ </span>vprint A.cpp</code><button disabled aria-label="复制 vprint A.cpp" title="复制命令"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button><span class="sr-only" role="status"></span>
+                </div>
+              </div>
+            </li>
+          </ol>
+        </section>
+      </main>
+      <footer class="lp-wrap lp-footer">
+        <a class="lp-brand" href="#top" aria-label="VPrint 首页"><svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-printer" aria-hidden="true"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"></path><rect x="6" y="14" width="12" height="8" rx="1"></rect></svg><span>VPrint</span></a><a href="https://github.com/vprint-ac/VPrint">GitHub <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up-right" aria-hidden="true"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg></a>
+      </footer>
+    </div>
+    <script type="module" src="/src/web/landing/main.ts"></script>
   </body>
 </html>
