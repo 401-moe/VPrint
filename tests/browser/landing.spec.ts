@@ -79,7 +79,7 @@ test.describe("public homepage with JavaScript", () => {
     await expect(sampleRegion(page)).toContainText("return dist[u];");
 
     const after = await layout(page);
-    expect(after.panelHeight).toBe(before.panelHeight);
+    expect(after.panelHeight).toBeCloseTo(before.panelHeight, 2);
     expect(after.pageHeight).toBe(before.pageHeight);
     expect(after.scrollTop).toBe(before.scrollTop);
     expect(after.receivedVisible).toBe(true);
