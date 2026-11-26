@@ -219,11 +219,13 @@ for (const kind of ["team", "contest"] as const) {
     } finally {
       release();
     }
-    const breadcrumb = page.getByRole("banner").getByRole("link", { name: "第一版", exact: true });
-    await expect(breadcrumb).toBeVisible();
+    const savedName = (name: string) => page.getByRole("main").getByText(
+      kind === "team" ? name : "原队 · " + name, { exact: true },
+    );
+    await expect(savedName("第一版")).toBeVisible();
     await expect(field).toHaveValue("第二版");
     await save.click();
-    await expect(page.getByRole("banner").getByRole("link", { name: "第二版", exact: true })).toBeVisible();
+    await expect(savedName("第二版")).toBeVisible();
     await page.reload();
     await expect(field).toHaveValue("第二版");
     await expect(save).toBeDisabled();
