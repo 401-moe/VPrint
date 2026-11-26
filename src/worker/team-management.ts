@@ -56,6 +56,42 @@ teamManagementRoutes.on(
   },
 );
 
+teamManagementRoutes.patch("/teams/:teamId", async (context) => {
+  const user = await currentUser(context);
+  if (!user) return context.json({ error: "authentication required" }, 401);
+  const requestedTeamId = context.req.param("teamId");
+  if (!teamId(requestedTeamId)) return context.json({ error: "team not found" }, 404);
+
+  let body: { name?: unknown } | null = null;
+  try {
+    body = await context.req.json();
+  } catch {
+    body = null;
+  }
+  const rawName = body?.name;
+  const trimmed = typeof rawName === "string" ? rawName.trim() : "";
+  if (trimmed.length === 0 || trimmed.length > 100) {
+    return context.json({ error: "invalid team name" }, 400);
+  }
+
+  const result = await context.env.DB.prepare(
+    `
+      UPDATE team
+      SET name = ?
+      WHERE id = ?
+        AND EXISTS (
+          SELECT 1 FROM team_member
+          WHERE teamId = team.id AND userId = ? AND role = 'owner'
+        )
+    `,
+  )
+    .bind(trimmed, requestedTeamId, user.id)
+    .run();
+  if (result.meta.changes === 0) return context.json({ error: "owner role required" }, 403);
+
+  return context.json({ id: requestedTeamId, name: trimmed });
+});
+
 teamManagementRoutes.get("/teams/:teamId/members", async (context) => {
   const user = await currentUser(context);
   if (!user) return context.json({ error: "authentication required" }, 401);

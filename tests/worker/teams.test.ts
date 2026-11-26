@@ -1,3 +1,4 @@
+import { createTeam, join, loopbackOrigin, request, signUp, workspace } from "./team-fixtures";
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeAll, expect, inject, test } from "vitest";
@@ -19,65 +20,8 @@ declare module "vitest" {
   }
 }
 
-const loopbackOrigin = "http://127.0.0.1:8787";
-
-function request(path: string, init: RequestInit = {}) {
-  return new Request(`${loopbackOrigin}${path}`, init);
-}
-
-function cookies(response: Response) {
-  return response.headers
-    .getSetCookie()
-    .map((cookie) => cookie.split(";")[0])
-    .join("; ");
-}
-
-async function signUp(member: { email: string; password: string; name: string }) {
-  const response = await worker.fetch(
-    request("/api/auth/sign-up/email", {
-      method: "POST",
-      headers: { "content-type": "application/json", origin: loopbackOrigin },
-      body: JSON.stringify(member),
-    }),
-    env,
-  );
-
-  if (!response.ok) throw new Error(`sign-up failed: ${response.status}`);
-  return { response, cookie: cookies(response) };
-}
-
-async function createTeam(cookie: string, name: string) {
-  const response = await worker.fetch(
-    request("/api/teams", {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({ name }),
-    }),
-    env,
-  );
-  if (!response.ok) throw new Error(`team creation failed: ${response.status}`);
-  return (await response.json()) as { id: string; invitationToken: string };
-}
-
-async function join(cookie: string, token: string) {
-  return worker.fetch(request(`/api/team-invitations/${token}/join`, {
-    method: "POST",
-    headers: { "content-type": "application/json", cookie },
-    body: "{}",
-  }), env);
-}
-
 async function previewInvitation(cookie: string, token: string) {
   return worker.fetch(request(`/api/team-invitations/${token}`, { headers: { cookie } }), env);
-}
-
-async function workspace(cookie: string, contestId?: string) {
-  return worker.fetch(
-    request(`/api/workspace${contestId ? `?contestId=${contestId}` : ""}`, {
-      headers: { cookie },
-    }),
-    env,
-  );
 }
 
 async function members(cookie: string, teamId: string) {
@@ -296,80 +240,15 @@ test("same-named contests have independent ids and appear newest first", async (
     await insertPrintout({ id, contestId: firstContest.id, userId: ownerId, requestId: crypto.randomUUID(), filename: "A.cpp" });
   }
 
-  const listed = await workspace(memberCookie);
-  const listBody = (await listed.json()) as {
-    selectedTeamId: string;
-    contests: { id: string; name: string; createdAt: number }[];
-  };
-  expect(listBody.selectedTeamId).toBe(team.id);
-  expect(listBody.contests.map((contest) => contest.id)).toEqual([
-    secondContest.id,
-    firstContest.id,
-  ]);
-  expect(listBody.contests[0]).toMatchObject({ printCount: 0, latestPrintId: null, latestFilename: null, latestPrintAt: null });
-  expect(listBody.contests[1]).toMatchObject({ printCount: 2, latestPrintId: printIds[1], latestFilename: "A.cpp", latestPrintAt: 1000 });
-  expect(listBody.contests[1]).not.toHaveProperty("content");
-});
-
-test("workspace restores the last accessible team and contest links take priority", async () => {
-  const suffix = Date.now();
-  const { cookie } = await signUp({
-    email: `multi-team-${suffix}@vprint.example`,
-    password: "correct horse battery staple",
-    name: "多队队员",
+  const listed = await workspace(memberCookie, { teamId: team.id });
+  expect(await listed.json()).toEqual({
+    scope: "team",
+    team: { id: team.id, name: "火苗", role: "member" },
+    contests: [
+      { ...secondContest, printCount: 0 },
+      { ...firstContest, printCount: 2 },
+    ],
   });
-  const firstTeam = await createTeam(cookie, "第一队");
-  const secondTeam = await createTeam(cookie, "第二队");
-  const contest = await worker.fetch(
-    request(`/api/teams/${firstTeam.id}/contests`, {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({ name: "旧队训练" }),
-    }),
-    env,
-  );
-  expect(contest.status).toBe(201);
-  const createdContest = (await contest.json()) as { id: string };
-
-  const initial = await workspace(cookie);
-  expect(((await initial.json()) as { selectedTeamId: string }).selectedTeamId).toBe(
-    firstTeam.id,
-  );
-
-  const switched = await worker.fetch(
-    request(`/api/teams/${secondTeam.id}/selection`, {
-      method: "PUT",
-      headers: { "content-type": "application/json", cookie },
-      body: "{}",
-    }),
-    env,
-  );
-  expect(switched.status).toBe(200);
-  const restored = await workspace(cookie);
-  expect(((await restored.json()) as { selectedTeamId: string }).selectedTeamId).toBe(
-    secondTeam.id,
-  );
-
-  const deepLinked = await workspace(cookie, createdContest.id);
-  const deepLinkedBody = (await deepLinked.json()) as {
-    selectedTeamId: string;
-    contest: { id: string };
-  };
-  expect(deepLinkedBody.selectedTeamId).toBe(firstTeam.id);
-  expect(deepLinkedBody.contest.id).toBe(createdContest.id);
-
-  await env.DB.prepare("DELETE FROM team_member WHERE teamId = ? AND userId = ?").bind(
-    secondTeam.id,
-    (
-      (await (
-        await worker.fetch(request("/api/me", { headers: { cookie } }), env)
-      ).json()) as { id: string }
-    ).id,
-  ).run();
-  const afterLoss = await workspace(cookie);
-  expect(((await afterLoss.json()) as { selectedTeamId: string }).selectedTeamId).toBe(
-    firstTeam.id,
-  );
 });
 
 test("an outside account cannot open a contest or create one for the team", async () => {
@@ -406,7 +285,7 @@ test("an outside account cannot open a contest or create one for the team", asyn
   );
   expect(outsiderCreation.status).toBe(403);
 
-  const outsiderDeepLink = await workspace(outsideCookie, contest.id);
+  const outsiderDeepLink = await workspace(outsideCookie, { teamId: team.id, contestId: contest.id });
   expect(outsiderDeepLink.status).toBe(403);
 });
 
@@ -492,11 +371,12 @@ test("the owner sees teammates, while members receive a redacted invitation", as
     { id: memberId, name: "乙", role: "member" },
   ]);
 
-  const memberWorkspace = await workspace(memberCookie);
-  const workspaceBody = (await memberWorkspace.json()) as {
-    teams: { id: string; invitationUrl: string }[];
-  };
-  expect(workspaceBody.teams.find((item) => item.id === team.id)?.invitationUrl).toBe("");
+  const memberSettings = await workspace(memberCookie, { teamId: team.id, view: "settings" });
+  expect(await memberSettings.json()).toEqual({
+    scope: "team-settings",
+    team: { id: team.id, name: expect.any(String), role: "member" },
+    invitationUrl: "",
+  });
 });
 
 test("the owner removes a member and resets the invitation together", async () => {
@@ -548,7 +428,7 @@ test("the owner removes a member and resets the invitation together", async () =
 
   const oldInvitation = await join(memberCookie, team.invitationToken);
   expect(oldInvitation.status).toBe(404);
-  const removedWorkspace = await workspace(memberCookie, team.id);
+  const removedWorkspace = await workspace(memberCookie, { teamId: team.id });
   expect(removedWorkspace.status).toBe(403);
 
   const reset = (await (await resetInvitation(ownerCookie, team.id)).json()) as {
@@ -829,9 +709,9 @@ test("only the current owner can delete a selected contest and its printouts", a
   );
   expect(deletion.status).toBe(200);
 
-  const deletedWorkspace = await workspace(ownerCookie, saturday.id);
+  const deletedWorkspace = await workspace(ownerCookie, { teamId: team.id, contestId: saturday.id });
   expect(deletedWorkspace.status).toBe(403);
-  const remainingWorkspace = await workspace(ownerCookie, sunday.id);
+  const remainingWorkspace = await workspace(ownerCookie, { teamId: team.id });
   expect(remainingWorkspace.status).toBe(200);
   expect(((await remainingWorkspace.json()) as { contests: { id: string }[] }).contests.map(
     (contest) => contest.id,

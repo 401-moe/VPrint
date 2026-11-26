@@ -26,7 +26,7 @@ h1 { font-weight: 750; }
 h2 { font-weight: 650; }
 .top, .bottom, .top nav, .brand, .cta, .text-link { display: flex; align-items: center; }
 .top, .bottom { justify-content: space-between; }
-.top { padding-block: 24px; }
+.top { padding-block: clamp(16px, 3vw, 24px); }
 .top nav { gap: clamp(12px, 3vw, 44px); font-size: 16px; }
 .top nav a, .bottom > a:last-child { padding-block: 9px; }
 .top nav a:hover, .bottom > a:last-child:hover, .sample-link:hover { text-decoration: underline; text-underline-offset: 5px; }
@@ -39,8 +39,8 @@ h2 { font-weight: 650; }
 .cta span, .text-link span { font-size: 20px; line-height: 1; transition: transform 160ms ease-out; }
 .cta:hover span, .text-link:hover span { transform: translateX(3px); }
 .lead { font-size: clamp(18px, 1.45vw, 21px); line-height: 1.65; }
-.paper-hero { display: grid; grid-template-columns: .8fr 1.2fr; align-items: center; gap: clamp(30px, 5vw, 86px); padding-block: clamp(36px,5vw,80px) clamp(64px,7vw,110px); }
-.paper-copy h1 { font-size: clamp(58px, 6.7vw, 104px); }
+.paper-hero { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); align-items: center; gap: clamp(30px, 5vw, 86px); padding-block: clamp(36px,5vw,80px) clamp(64px,7vw,110px); }
+.paper-copy h1 { font-size: clamp(3.375rem, 2rem + 4.5vw, 6.5rem); }
 .paper-copy .lead { margin-block: 28px; max-width: 24em; }
 .sample-link { display: inline-block; padding-block: 12px; color: var(--soft); }
 .paper-copy .cta { display: inline-flex; margin-right: 16px; }
@@ -97,16 +97,11 @@ time { font-variant-numeric: tabular-nums; }
 .bottom { background: var(--ink); color: var(--white); padding-block: 32px; }
 .bottom .brand img { filter: invert(1); }
 
-@media (min-width: 701px) and (max-width: 900px) {
-  .paper-hero { grid-template-columns: .95fr 1.05fr; gap: 24px; }
-}
 @media (max-width: 700px) {
-  .top { padding-block: 16px; }
   .brand strong { font-size: 22px; }
   .brand img { width: 30px; height: 30px; }
   .paper-hero { grid-template-columns: 1fr; }
   .paper-hero { min-height: calc(100svh - 72px); align-content: center; gap: 30px; padding-block: 24px 42px; }
-  .paper-copy h1 { font-size: clamp(54px, 14vw, 80px); }
   .paper-copy .lead { margin-block: 20px; }
   .printer-figure figcaption { font-size: 14px; }
   .sample-heading { display: block; }

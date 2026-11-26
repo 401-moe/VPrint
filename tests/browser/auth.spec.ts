@@ -44,7 +44,7 @@ async function registration(page: Page, email: string) {
 async function signUp(page: Page, email: string) {
   await registration(page, email);
   await button(page, "创建并进入").click();
-  await expect(heading(page, "比赛工作台")).toBeVisible();
+  await expect(heading(page, "我的队伍")).toBeVisible();
 }
 
 async function account(page: Page) {
@@ -53,7 +53,7 @@ async function account(page: Page) {
 }
 
 async function signOut(page: Page) {
-  await account(page);
+  if (!new URL(page.url()).pathname.startsWith("/account")) await account(page);
   await button(page, "退出登录").click();
   await expect(heading(page, "登录训练工作区")).toBeVisible();
 }
@@ -90,7 +90,7 @@ test("registration isolates credentials and submits autofilled values without a 
   await button(page, "显示密码").click();
   await expect(password).toHaveAttribute("type", "password");
   await button(page, "创建并进入").click();
-  await expect(heading(page, "比赛工作台")).toBeVisible();
+  await expect(heading(page, "我的队伍")).toBeVisible();
   await signOut(page);
   await signIn(page, email, originalPassword);
   await expect(heading(page, "账号设置")).toBeVisible();
@@ -125,7 +125,7 @@ test("password login preserves the member after reload and recovers from a misty
   await signUp(page, email);
   const id = await memberId(page);
   await page.reload();
-  await expect(heading(page, "比赛工作台")).toBeVisible();
+  await expect(heading(page, "我的队伍")).toBeVisible();
   expect(await memberId(page)).toBe(id);
   await signOut(page);
   await signIn(page, email, "not the password");
@@ -147,7 +147,7 @@ test("a failed registration request preserves the form for retry", async ({ page
   await expect(field(page, "邮箱")).toHaveValue(email);
   await page.unroute("**/api/auth/sign-up/email");
   await button(page, "创建并进入").click();
-  await expect(heading(page, "比赛工作台")).toBeVisible();
+  await expect(heading(page, "我的队伍")).toBeVisible();
 });
 
 test("email login verifies the mailbox and preserves the requested invitation", async ({ page, baseURL }) => {
@@ -215,7 +215,7 @@ for (const firstPassword of [false, true]) {
       await button(page, "获取验证码").click();
       await field(page, "邮箱验证码").fill(await receiveCode(baseURL!, email, "登录"));
       await button(page, "验证并登录").click();
-      await expect(heading(page, "比赛工作台")).toBeVisible();
+      await expect(heading(page, "我的队伍")).toBeVisible();
       await account(page);
       await expect(page.getByText("尚未设置密码，可通过邮箱验证码设置")).toBeVisible();
       await button(page, "设置密码").click();
@@ -247,3 +247,39 @@ for (const firstPassword of [false, true]) {
     await expect(button(page, "修改密码")).toBeVisible();
   });
 }
+
+test("the password dialog stays centered during transitions and scrolls in a short viewport", async ({ page }) => {
+  await signUp(page, address());
+  await account(page);
+  await page.setViewportSize({ width: 740, height: 320 });
+  await button(page, "修改密码").click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toHaveCSS("opacity", "1");
+
+  // Measure the CSS endpoints without relying on when the browser paints an animation frame.
+  const { centers, top, bottom, scrollable } = await dialog.evaluate(element => {
+    const probe = element.cloneNode(false) as HTMLElement;
+    probe.removeAttribute("id");
+    probe.style.height = element.getBoundingClientRect().height + "px";
+    probe.style.transition = "none";
+    element.after(probe);
+    const centers = ["", "data-starting-style", "data-ending-style"].map(state => {
+      if (state) probe.setAttribute(state, "");
+      const box = probe.getBoundingClientRect();
+      if (state) probe.removeAttribute(state);
+      return [box.x + box.width / 2, box.y + box.height / 2];
+    });
+    probe.remove();
+    const { top, bottom } = element.getBoundingClientRect();
+    return { centers, top, bottom, scrollable: element.scrollHeight > element.clientHeight };
+  });
+  for (const [x, y] of centers) {
+    expect(x).toBeCloseTo(centers[0][0], 1);
+    expect(y).toBeCloseTo(centers[0][1], 1);
+  }
+  expect(top).toBeGreaterThanOrEqual(0);
+  expect(bottom).toBeLessThanOrEqual(320);
+  expect(scrollable).toBe(true);
+  await dialog.getByRole("button", { name: "取消" }).click();
+  await expect(dialog).toHaveCount(0);
+});
