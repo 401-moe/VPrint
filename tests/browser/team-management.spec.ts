@@ -1,5 +1,16 @@
 import { expect, test, type Page } from "@playwright/test";
 
+async function expectCopy(page: Page, label: string, expected: string) {
+  const button = page.getByRole("button", { name: label, exact: true });
+  const success = button.getByText("复制成功", { exact: true });
+  const width = await button.evaluate((element) => getComputedStyle(element).width);
+  await button.click();
+  await expect(success).toHaveCSS("opacity", "1");
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(expected);
+  expect(await button.evaluate((element) => getComputedStyle(element).width)).toBe(width);
+  await expect(success).toHaveCSS("opacity", "0");
+}
+
 async function register(page: Page, name: string) {
   await page.getByRole("button", { name: "注册", exact: true }).click();
   await page.getByLabel("姓名").fill(name);
@@ -27,6 +38,8 @@ test("owners preview, confirm, and reset invitation changes on team settings", a
 
   const field = page.getByRole("textbox", { name: "邀请链接" });
   const previous = await field.inputValue();
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await expectCopy(page, "复制链接", previous);
   await expect(page.getByText("同一条链接可邀请多人。")).toBeVisible();
 
   await page.getByRole("button", { name: "重置链接" }).click();
@@ -126,8 +139,12 @@ test("contest settings allow renaming and owner deletion confirmation", async ({
   await page.getByRole("link", { name: /初版训练名/ }).click();
   await expect(page.getByRole("heading", { name: "打印列表" })).toBeVisible();
 
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await expectCopy(page, "复制打印命令", "vprint A.cpp");
   await page.getByRole("link", { name: "比赛设置" }).click();
   await expect(page.getByRole("heading", { name: "比赛设置" })).toBeVisible();
+  const [, , teamId, , contestId] = new URL(page.url()).pathname.split("/");
+  await expectCopy(page, "复制命令", `vprint use --team ${teamId} --contest ${contestId}`);
   await page.getByLabel("比赛名称").fill("确认删除");
   await page.getByRole("button", { name: "保存名称" }).click();
   await expect(page.getByText("比赛管理 · 确认删除")).toBeVisible();

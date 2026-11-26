@@ -1,11 +1,14 @@
 import { type FormEvent, lazy, type MouseEventHandler, Suspense, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Copy, Settings, Terminal, Trash2 } from "lucide-react";
+import { ArrowLeft, Settings, Terminal, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "./api";
 import { languageForFilename } from "./file-language";
 import { Button, buttonClassName } from "./ui/button";
+import { CopyButton } from "./ui/copy-button";
 import { DialogContent, DialogRoot } from "./ui/dialog";
 import { Input } from "./ui/input";
+
+const examplePrintCommand = "vprint A.cpp";
 
 interface PrintRecord {
   id: string;
@@ -200,9 +203,12 @@ export function PrintList({
               还没有打印件。队员从 CLI 打印后，文件会出现在这里。
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <code className="inline-flex items-center rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--ground)] px-3 py-1.5 text-[12px] text-[var(--text)]">
-                $ vprint A.cpp
-              </code>
+              <div className="inline-flex items-center rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--ground)] pl-3">
+                <code className="text-[12px] text-[var(--text)]">
+                  <span aria-hidden="true">$ </span>{examplePrintCommand}
+                </code>
+                <CopyButton value={examplePrintCommand} label="复制打印命令" iconOnly />
+              </div>
               <a
                 className={buttonClassName({ variant: "secondary", compact: true })}
                 href="https://github.com/vprint-ac/VPrint/releases"
@@ -310,15 +316,6 @@ export function ContestSettings({
       setError(cause instanceof Error ? cause.message : "保存比赛名称失败。");
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function copyCliCommand() {
-    try {
-      await navigator.clipboard.writeText(cliCommand);
-      toast.success("已复制 CLI 绑定命令");
-    } catch {
-      toast.error("复制失败，请手动选中命令复制");
     }
   }
 
@@ -431,14 +428,7 @@ export function ContestSettings({
           <code className="min-w-0 flex-1 break-words text-[13px] text-[var(--text)]">
             {cliCommand}
           </code>
-          <Button
-            variant="secondary"
-            compact
-            onClick={() => void copyCliCommand()}
-          >
-            <Copy size={13} aria-hidden="true" />
-            <span>复制命令</span>
-          </Button>
+          <CopyButton value={cliCommand} label="复制命令" />
         </div>
       </section>
 

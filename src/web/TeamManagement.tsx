@@ -1,8 +1,9 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, Copy, MoreHorizontal, RefreshCw } from "lucide-react";
+import { ArrowLeft, MoreHorizontal, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "./api";
 import { Button, buttonClassName } from "./ui/button";
+import { CopyButton } from "./ui/copy-button";
 import { DialogContent, DialogRoot } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { MenuItem, MenuPopup, MenuRoot, MenuTrigger } from "./ui/menu";
@@ -99,9 +100,7 @@ export function TeamManagement({
 
   const [teammates, setTeammates] = useState<Teammate[]>([]);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-  const [inviteStatus, setInviteStatus] = useState<
-    "idle" | "copied" | "reset" | "failed"
-  >("idle");
+  const [invitationReset, setInvitationReset] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -147,16 +146,6 @@ export function TeamManagement({
     }
   }
 
-  async function copyInvitation() {
-    try {
-      await navigator.clipboard.writeText(invitationUrl);
-      setInviteStatus("copied");
-      toast.success("已复制队伍邀请链接");
-    } catch {
-      setInviteStatus("failed");
-    }
-  }
-
   async function openDissolvePreview() {
     if (pending) return;
     setPending(true);
@@ -184,7 +173,7 @@ export function TeamManagement({
           { method: "POST", body: "{}" },
         );
         onInvitationChange(body.invitationUrl);
-        setInviteStatus("reset");
+        setInvitationReset(true);
         toast.success("邀请链接已重置，旧链接已失效");
       } else if (confirmation.kind === "remove") {
         const body = await api<{ invitationUrl: string }>(
@@ -283,13 +272,7 @@ export function TeamManagement({
                 邀请链接
               </h2>
               <p className="mt-1 text-[13px] text-[var(--muted)]" role="status">
-                {inviteStatus === "reset"
-                  ? "链接已重置，旧链接已失效。"
-                  : inviteStatus === "copied"
-                    ? "邀请链接已复制。"
-                    : inviteStatus === "failed"
-                      ? "复制失败，请选中链接后手动复制。"
-                      : "同一条链接可邀请多人。"}
+                {invitationReset ? "链接已重置，旧链接已失效。" : "同一条链接可邀请多人。"}
               </p>
             </div>
             <Button
@@ -313,18 +296,7 @@ export function TeamManagement({
               onFocus={(event) => event.target.select()}
               className="flex-1 min-w-[200px] vp-code-name"
             />
-            <Button
-              variant="secondary"
-              disabled={!invitationUrl}
-              onClick={() => void copyInvitation()}
-            >
-              {inviteStatus === "copied" ? (
-                <Check size={14} aria-hidden="true" />
-              ) : (
-                <Copy size={14} aria-hidden="true" />
-              )}
-              <span>{inviteStatus === "copied" ? "已复制" : "复制链接"}</span>
-            </Button>
+            <CopyButton value={invitationUrl} label="复制链接" />
           </div>
         </section>
       )}
