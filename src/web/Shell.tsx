@@ -23,14 +23,14 @@ export function BreadcrumbHeader({
 }) {
   return (
     <header className="border-b border-[var(--border)] bg-[var(--surface)]">
-      <div className="mx-auto flex h-12 max-w-[1160px] items-center justify-between gap-4 px-4 sm:px-6">
+      <div className="vp-frame flex h-12 items-center justify-between gap-4">
         <nav
           aria-label="页面层级导航"
           className="flex min-w-0 items-center gap-1.5 text-[13px]"
         >
           <a
             href="/"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-1.5 py-1 font-semibold text-[var(--text)] vp-hover-surface max-md:min-h-[44px]"
+            className="-ml-1.5 inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-1.5 py-1 font-semibold text-[var(--text)] vp-hover-surface max-md:min-h-[44px]"
           >
             <Printer size={15} className="text-[var(--muted)]" aria-hidden="true" />
             <span>VPrint</span>

@@ -263,7 +263,7 @@ export function Workspace({
   function loading() {
     if (failed?.key !== queryKey) {
       return (
-        <main className="mx-auto max-w-[960px] px-4 py-10 sm:px-6">
+        <main className="vp-page">
           <p className="text-[13px] text-[var(--muted)]" role="status">
             正在读取{contestId ? "比赛" : routeTeamId ? "队伍" : "工作区"}…
           </p>
@@ -287,8 +287,8 @@ export function Workspace({
       : "请检查网络后重试。";
 
     return (
-      <main className="mx-auto max-w-[520px] px-4 py-10 sm:px-6">
-        <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-6 space-y-4">
+      <main className="vp-page">
+        <section className="max-w-[520px] rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-6 space-y-4">
           <div>
             <h1 className="text-[20px] font-semibold text-[var(--text)]">
               {headingText}
@@ -451,7 +451,7 @@ export function Workspace({
       />
 
       {message && (
-        <div className="mx-auto max-w-[960px] px-4 pt-4 sm:px-6">
+        <div className="vp-frame pt-4">
           <p
             role="alert"
             className="rounded-[var(--radius-control)] border border-[var(--negative)]/35 bg-[var(--surface)] px-4 py-2.5 text-[13px] text-[var(--negative)]"

@@ -127,10 +127,10 @@ export function PrintList({
   if (error) {
     return (
       <main
-        className="mx-auto max-w-[960px] px-4 py-8 sm:px-6"
+        className="vp-page"
         aria-label="打印件列表"
       >
-        <h1 className="text-[22px] font-semibold text-[var(--text)]">
+        <h1 className="vp-page-title">
           无法读取打印列表
         </h1>
         <p role="alert" className="mt-2 text-[13px] text-[var(--negative)]">
@@ -143,7 +143,7 @@ export function PrintList({
   if (!records) {
     return (
       <main
-        className="mx-auto max-w-[960px] px-4 py-8 sm:px-6"
+        className="vp-page"
         aria-busy="true"
         aria-label="打印件列表"
       >
@@ -157,7 +157,7 @@ export function PrintList({
   const dupTags = computeDuplicateTags(records);
 
   return (
-    <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6" ref={root}>
+    <main className="vp-page" ref={root}>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <a
@@ -165,13 +165,13 @@ export function PrintList({
             className={buttonClassName({
               variant: "ghost",
               compact: true,
-              className: "-ml-2 mb-1",
+              className: "vp-page-back",
             })}
           >
             <ArrowLeft size={14} aria-hidden="true" />
             <span>返回比赛列表</span>
           </a>
-          <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)]">
+          <h1 className="vp-page-title">
             打印列表
           </h1>
           <p className="mt-1 text-[13px] text-[var(--muted)] vp-num">
@@ -351,7 +351,7 @@ export function ContestSettings({
   }
 
   return (
-    <main className="mx-auto max-w-[760px] px-4 py-8 sm:px-6 space-y-6">
+    <main className="vp-page space-y-6">
       <div>
         <a
           href={contestHref}
@@ -359,13 +359,13 @@ export function ContestSettings({
           className={buttonClassName({
             variant: "ghost",
             compact: true,
-            className: "-ml-2 mb-1",
+            className: "vp-page-back",
           })}
         >
           <ArrowLeft size={14} aria-hidden="true" />
           <span>返回打印列表</span>
         </a>
-        <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)]">
+        <h1 className="vp-page-title">
           比赛设置
         </h1>
         <p className="mt-1 text-[13px] text-[var(--muted)]">
@@ -557,13 +557,13 @@ export function PrintPage({
   const language = detail ? languageForFilename(detail.filename) : "";
 
   return (
-    <main className="mx-auto max-w-[1160px] px-4 py-6 sm:px-6">
+    <main className="vp-page">
       <div className="mb-4">
         <a
           className={buttonClassName({
             variant: "ghost",
             compact: true,
-            className: "-ml-2 mb-1",
+            className: "vp-page-back",
           })}
           onClick={navigate}
           href={contestHref}
@@ -583,8 +583,8 @@ export function PrintPage({
 
         {detail && (
           <article aria-label="打印件">
-            <header className="mb-4">
-              <h1 className="vp-code-name text-[20px] sm:text-[22px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)] break-all">
+            <header className="mb-5">
+              <h1 className="vp-page-title vp-code-name break-all">
                 {detail.filename}
               </h1>
               <p className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-[var(--muted)] vp-num">

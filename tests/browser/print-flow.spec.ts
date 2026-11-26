@@ -8,6 +8,17 @@ test("a member authorizes a real CLI and reads its print on phones and desktops"
   page,
   baseURL,
 }) => {
+  function layout(title: string) {
+    return page.getByRole("heading", { level: 1, name: title, exact: true }).evaluate(heading => {
+      const rect = heading.getBoundingClientRect();
+      return {
+        left: rect.left, top: rect.top + window.scrollY,
+        fontSize: getComputedStyle(heading).fontSize,
+        width: heading.closest("main")!.getBoundingClientRect().width,
+      };
+    });
+  }
+
   const email = `print-flow-${crypto.randomUUID()}@vprint.example`;
   await page.goto("/");
   await page.getByRole("link", { name: "进入训练工作区" }).click();
@@ -16,17 +27,19 @@ test("a member authorizes a real CLI and reads its print on phones and desktops"
   await page.getByLabel("邮箱").fill(email);
   await page.getByLabel("设置密码").fill(password);
   await page.getByRole("button", { name: "创建并进入" }).click();
-  await expect(page.getByRole("heading", { name: "我的队伍" })).toBeVisible();
+  const teamListLayout = await layout("我的队伍");
   await page.getByRole("button", { name: "新建队伍" }).first().click();
   await page.getByLabel("队伍名称").fill(name);
   await page.getByRole("button", { name: "创建队伍", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "比赛列表" })).toBeVisible();
+  expect(await layout("比赛列表")).toEqual(teamListLayout);
   await page.getByRole("button", { name: "新建比赛" }).first().click();
   await page.getByLabel("比赛名称").fill(name);
   await page.getByRole("button", { name: "创建比赛", exact: true }).click();
   const contest = page.getByRole("list", { name: "比赛" }).getByRole("link", { name: new RegExp(name) });
   await contest.click();
+  expect(await layout("打印列表")).toEqual(teamListLayout);
   await page.getByRole("link", { name: "比赛设置" }).click();
+  expect(await layout("比赛设置")).toEqual(teamListLayout);
   const [, , teamId, , contestId] = new URL(page.url()).pathname.split("/");
   const command = page.locator("code").filter({ hasText: "vprint use" });
   await expect(command).toHaveText(`vprint use --team ${teamId} --contest ${contestId}`);
@@ -71,7 +84,7 @@ test("a member authorizes a real CLI and reads its print on phones and desktops"
     await printCli(secondSource.filename);
     await expect(page.getByText("本场比赛有新打印件")).toBeVisible();
     await expect(page.getByRole("region", { name: "源码" })).toContainText(firstSource.content.trimEnd());
-    await expect(page.getByRole("heading", { name: firstSource.filename })).toBeVisible();
+    expect(await layout(firstSource.filename)).toEqual(teamListLayout);
     await page.getByRole("link", { name: "返回打印列表" }).click();
     const secondLink = page.getByRole("link", { name: /reader\.cpp/ });
     await expect(secondLink).toBeVisible();

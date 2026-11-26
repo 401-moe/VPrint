@@ -87,9 +87,9 @@ export function InvitePage({
 
   if (!checked) {
     return (
-      <main className="mx-auto max-w-[520px] px-4 py-10" aria-busy="true">
+      <main className="vp-page" aria-busy="true">
         <header className="mb-5">
-          <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)]">
+          <h1 className="vp-page-title">
             加入队伍
           </h1>
           <p className="mt-1 text-[13px] text-[var(--muted)]">正在读取邀请…</p>
@@ -105,14 +105,14 @@ export function InvitePage({
 
   if (invalid) {
     return (
-      <main className="mx-auto max-w-[520px] px-4 py-10">
+      <main className="vp-page">
         <header className="mb-5">
-          <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)]">
+          <h1 className="vp-page-title">
             加入队伍
           </h1>
           <p className="mt-1 text-[13px] text-[var(--muted)]">这条邀请链接无效。</p>
         </header>
-        <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6 space-y-4">
+        <section className="max-w-[520px] rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6 space-y-4">
           <p className="text-[13px] text-[var(--negative)]">
             邀请不存在或已被重置。请向队伍队长索取新的邀请链接。
           </p>
@@ -130,9 +130,9 @@ export function InvitePage({
 
   if (!preview) {
     return (
-      <main className="mx-auto max-w-[520px] px-4 py-10 space-y-4">
+      <main className="vp-page space-y-4">
         <header>
-          <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)]">
+          <h1 className="vp-page-title">
             加入队伍
           </h1>
         </header>
@@ -150,21 +150,21 @@ export function InvitePage({
   }
 
   return (
-    <main className="mx-auto max-w-[520px] px-4 py-10">
+    <main className="vp-page">
       <div className="mb-5">
         <a
           href="/workspace"
-          className={buttonClassName({ variant: "ghost", compact: true, className: "-ml-2 mb-1" })}
+          className={buttonClassName({ variant: "ghost", compact: true, className: "vp-page-back" })}
         >
           <ArrowLeft size={14} aria-hidden="true" />
           <span>返回所有队伍</span>
         </a>
-        <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)]">
+        <h1 className="vp-page-title">
           加入队伍
         </h1>
       </div>
 
-      <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-6 space-y-4">
+      <section className="max-w-[520px] rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-6 space-y-4">
         <div className="inline-flex size-10 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] text-[var(--text)]">
           <UsersRound size={20} aria-hidden="true" />
         </div>

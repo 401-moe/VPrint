@@ -174,7 +174,7 @@ export function AccountSettings({
   }
 
   return (
-    <main className="mx-auto max-w-[760px] px-4 py-8 sm:px-6 space-y-6">
+    <main className="vp-page space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <a
@@ -182,13 +182,13 @@ export function AccountSettings({
             className={buttonClassName({
               variant: "ghost",
               compact: true,
-              className: "-ml-2 mb-1",
+              className: "vp-page-back",
             })}
           >
             <ArrowLeft size={14} aria-hidden="true" />
             <span>返回我的队伍</span>
           </a>
-          <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)]">
+          <h1 className="vp-page-title">
             账号设置
           </h1>
           <p className="mt-1 text-[13px] text-[var(--muted)]">

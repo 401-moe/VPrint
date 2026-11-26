@@ -37,10 +37,10 @@ export function UserTeamsPage({
   onOpenCreateTeam: () => void;
 }) {
   return (
-    <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6">
+    <main className="vp-page">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)]">
+          <h1 className="vp-page-title">
             我的队伍
           </h1>
           <p className="mt-1 text-[13px] text-[var(--muted)] vp-num">
@@ -158,7 +158,7 @@ export function TeamContestsPage({
   }
 
   return (
-    <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6">
+    <main className="vp-page">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <a
@@ -166,13 +166,13 @@ export function TeamContestsPage({
             className={buttonClassName({
               variant: "ghost",
               compact: true,
-              className: "-ml-2 mb-1",
+              className: "vp-page-back",
             })}
           >
             <ArrowLeft size={14} aria-hidden="true" />
             <span>返回所有队伍</span>
           </a>
-          <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)]">
+          <h1 className="vp-page-title">
             比赛列表
           </h1>
           <p className="mt-1 text-[13px] text-[var(--muted)] vp-num">
