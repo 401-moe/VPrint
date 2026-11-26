@@ -1,0 +1,240 @@
+@import "tailwindcss" source("./");
+
+:root {
+  --z-dropdown: 100;
+  --z-modal: 200;
+  --z-tooltip: 300;
+  --z-toast: 400;
+
+  --ground: #f6f6f4;
+  --surface: #ffffff;
+  --input-bg: #fafaf8;
+  --raised: #ecebe8;
+  --active: #e6e4df;
+  --border: #e2e1dd;
+  --rule: #e5e4e0;
+  --control: #cccbc6;
+  --text: #111110;
+  --muted: #5c5c58;
+  --faint: #686863;
+  --accent: #1d5fbf;
+  --primary: #141413;
+  --primary-ink: #ffffff;
+  --focus-ring: #111110;
+  --negative: #c4242a;
+  --negative-text: #c4242a;
+  --backdrop: rgba(17, 17, 16, 0.32);
+  --radius-card: 6px;
+  --radius-control: 6px;
+  --vp-font: "Geist", "PingFang SC", system-ui, -apple-system, sans-serif;
+  --vp-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --overlay-shadow: 0 8px 24px rgba(17, 17, 16, 0.12), 0 1px 3px rgba(17, 17, 16, 0.08);
+  --syn-kw: #ac2636;
+  --syn-str: #0a3069;
+  --syn-num: #0550ae;
+  --syn-cmt: #63676e;
+  --syn-fn: #6639ba;
+  --syn-type: #953800;
+}
+
+body {
+  margin: 0;
+  background-color: var(--ground);
+  color: var(--text);
+  font-family: var(--vp-font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body :is(button, a, input, select, textarea, summary, [tabindex]) {
+  touch-action: manipulation;
+}
+
+body :is(button, a, summary, [tabindex]):focus-visible,
+body :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.vp-site {
+  min-height: 100dvh;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--vp-font);
+}
+
+.vp-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.vp-site pre,
+.vp-site code,
+.vp-dialog-popup pre,
+.vp-dialog-popup code,
+.vp-code-name {
+  font-family: var(--vp-mono);
+}
+
+/* Base UI Portals live in document.body, so set surface, border, and font explicitly here */
+.vp-popup-menu,
+.vp-dialog-popup {
+  background-color: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-family: var(--vp-font);
+  box-shadow: var(--overlay-shadow); /* taste-skill-ignore */
+  --t-enter: 160ms;
+  --t-exit: 110ms;
+  transition-property: opacity, transform;
+  transition-duration: var(--t-enter);
+  transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.vp-popup-menu {
+  transform-origin: var(--transform-origin);
+}
+
+.vp-popup-menu:is([data-starting-style], [data-ending-style]) {
+  opacity: 0;
+  transform: scale(0.96);
+}
+
+.vp-popup-menu[data-ending-style],
+.vp-dialog-popup[data-ending-style] {
+  transition-duration: var(--t-exit);
+}
+
+.vp-dialog-backdrop {
+  transition-property: opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+.vp-dialog-backdrop:is([data-starting-style], [data-ending-style]) {
+  opacity: 0;
+}
+
+.vp-dialog-popup:is([data-starting-style], [data-ending-style]) {
+  opacity: 0;
+  transform: translate(-50%, -48%) scale(0.96);
+}
+
+/* Source reader: independent non-copyable line gutter + smooth horizontal scroll */
+.vp-source-scroll {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: visible;
+  font-family: var(--vp-mono);
+  font-size: 14px;
+  line-height: 1.65;
+  tab-size: 4;
+  color: var(--text);
+  background: var(--surface);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.vp-source-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.vp-source-scroll::-webkit-scrollbar-thumb {
+  background: rgba(120, 124, 130, 0.32);
+  border-radius: 4px;
+}
+
+.vp-source-lines {
+  flex: none;
+  user-select: none;
+  -webkit-user-select: none;
+  text-align: right;
+  color: var(--faint);
+  padding: 16px 14px 24px 16px;
+  border-right: 1px solid var(--rule);
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+}
+
+.vp-source-lines::before {
+  content: attr(data-lines);
+}
+
+.vp-source-pre {
+  margin: 0;
+  flex: none;
+  padding: 16px 24px 24px 16px;
+  font: inherit;
+  white-space: pre;
+}
+
+.vp-source-pre code {
+  font: inherit;
+  white-space: pre;
+}
+
+.vp-source-pre .hljs-keyword,
+.vp-source-pre .hljs-type,
+.vp-source-pre .hljs-doctag {
+  color: var(--syn-kw);
+}
+
+.vp-source-pre .hljs-string,
+.vp-source-pre .hljs-regexp {
+  color: var(--syn-str);
+}
+
+.vp-source-pre .hljs-number,
+.vp-source-pre .hljs-literal {
+  color: var(--syn-num);
+}
+
+.vp-source-pre .hljs-comment {
+  color: var(--syn-cmt);
+}
+
+.vp-source-pre .hljs-title,
+.vp-source-pre .hljs-title\.function_ {
+  color: var(--syn-fn);
+}
+
+.vp-source-pre .hljs-built_in,
+.vp-source-pre .hljs-symbol {
+  color: var(--syn-type);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .vp-hover-surface:hover {
+    background: var(--raised);
+  }
+  .vp-hover-row:hover {
+    background: var(--raised);
+  }
+}
+
+.vp-btn-press {
+  transition-property: background-color, color, border-color, opacity, transform;
+  transition-duration: 140ms;
+  transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.vp-btn-press:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vp-site *,
+  .vp-site *::before,
+  .vp-site *::after,
+  .vp-popup-menu,
+  .vp-dialog-popup,
+  .vp-dialog-backdrop {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .vp-btn-press:active:not(:disabled) {
+    transform: none;
+  }
+}

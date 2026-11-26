@@ -9,28 +9,33 @@ async function register(page: Page, name: string) {
 }
 
 async function createTeam(page: Page, name: string) {
+  await page.getByRole("button", { name: "新建队伍" }).first().click();
   await page.getByLabel("队伍名称").fill(name);
   await page.getByRole("button", { name: "创建队伍" }).click();
-  await expect(page.getByRole("button", { name: `切换队伍，当前为${name}` })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "比赛列表" })).toBeVisible();
+  await expect(page.getByRole("link", { name })).toBeVisible();
 }
 
 async function createContest(page: Page, name: string) {
-  await page.getByRole("button", { name: "新建比赛" }).click();
+  await page.getByRole("button", { name: "新建比赛" }).first().click();
   await page.getByLabel("比赛名称").fill(name);
   await page.getByRole("button", { name: "创建比赛" }).click();
-  await expect(page.getByRole("list", { name: "比赛" }).getByRole("link", { name: new RegExp(name) })).toBeVisible();
+  await expect(
+    page.getByRole("list", { name: "比赛" }).getByRole("link", { name: new RegExp(name) }),
+  ).toBeVisible();
 }
 
 async function signOut(page: Page) {
-  await page.getByRole("link", { name: "账号设置", exact: true }).click();
+  await page.goto("/account");
   await page.getByRole("button", { name: "退出登录", exact: true }).click();
   await expect(page.getByRole("button", { name: "注册", exact: true })).toBeVisible();
 }
 
-test("an owner creates a team and contests, then a teammate explicitly joins by invitation", async ({ page }) => {
+test("an owner creates a team and contests, then a teammate explicitly joins by invitation", async ({
+  page,
+}) => {
   await page.goto("/login");
   await register(page, "浏览器建队者");
-  await page.getByRole("button", { name: "新建队伍" }).click();
   await createTeam(page, "火苗");
   await createContest(page, "周六训练");
   await createContest(page, "周日训练");
@@ -39,42 +44,49 @@ test("an owner creates a team and contests, then a teammate explicitly joins by 
   await expect(rows.first()).toContainText("周日训练");
 
   await page.getByRole("link", { name: "队伍设置" }).click();
-  await page.getByRole("button", { name: "邀请队员" }).click();
+  await expect(page.getByRole("heading", { name: "队伍设置" })).toBeVisible();
   const link = page.getByRole("textbox", { name: "邀请链接" });
   await expect(link).toHaveValue(/\/invite\/[a-f0-9]{32}$/);
   const invitation = await link.inputValue();
-  await page.keyboard.press("Escape");
+
   await signOut(page);
   await page.goto(invitation);
   await register(page, "浏览器队友");
   await page.getByRole("button", { name: "加入队伍" }).click();
-  await expect(page.getByRole("button", { name: "切换队伍，当前为火苗" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "比赛列表" })).toBeVisible();
   await expect(rows).toHaveCount(2);
+
   await page.getByRole("link", { name: "队伍设置" }).click();
   await expect(page.getByRole("button", { name: "退出队伍" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "邀请队员" })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "邀请链接" })).toHaveCount(0);
 });
 
-test("a multi-team user returns from a deep link to its team and an outsider sees denial", async ({ page }) => {
+test("a multi-team user returns from a deep link to its team and an outsider sees denial", async ({
+  page,
+}) => {
   await page.goto("/login");
   await register(page, "多队队员");
-  await page.getByRole("button", { name: "新建队伍" }).click();
   await createTeam(page, "第一队");
   await createContest(page, "第一队训练");
-  const contestPath = await page.getByRole("link", { name: /第一队训练/ }).getAttribute("href");
+  const contestPath = await page
+    .getByRole("link", { name: /第一队训练/ })
+    .getAttribute("href");
   expect(contestPath).toMatch(/^\/contest\//);
-  await page.getByRole("button", { name: /切换队伍/ }).click();
-  await page.getByRole("menuitem", { name: "新建队伍" }).click();
+
+  await page.getByRole("link", { name: "所有队伍", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "我的队伍" })).toBeVisible();
   await createTeam(page, "第二队");
+
   await page.goto(contestPath!);
-  await expect(page.getByRole("heading", { name: "第一队训练" })).toBeVisible();
-  await page.getByRole("link", { name: "返回工作台" }).click();
-  await expect(page.getByRole("button", { name: "切换队伍，当前为第一队" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "打印列表" })).toBeVisible();
+  await page.getByRole("link", { name: "返回比赛列表" }).click();
+  await expect(page.getByRole("heading", { name: "比赛列表" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "第一队", exact: true })).toBeVisible();
 
   await signOut(page);
   await register(page, "队外队员");
   await expect(page.getByRole("heading", { name: "账号设置", exact: true })).toBeVisible();
   await page.goto(contestPath!);
   await expect(page.getByRole("heading", { name: "无法访问比赛" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "返回工作台" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "返回所有队伍" })).toBeVisible();
 });

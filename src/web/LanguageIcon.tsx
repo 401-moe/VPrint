@@ -49,7 +49,7 @@ export function grammarForFilename(filename: string) {
 
 export function LanguageIcon({ language: name }: { language: string }) {
   return (
-    <svg className="file-language-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="15" height="15" className="file-language-icon shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
       {glyphs.get(name) ?? <path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-14-2 18" />}
     </svg>

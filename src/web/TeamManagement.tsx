@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { Menu } from "@base-ui/react/menu";
-import { Check, ChevronDown, Copy, RotateCcw, UserPlus, X } from "lucide-react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
+import { ArrowLeft, Check, Copy, MoreHorizontal, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { api } from "./api";
-import { Button } from "./components/ui/button";
-import { DeleteGroup } from "./DeleteGroup";
+import { Button, buttonClassName } from "./ui/button";
+import { DialogContent, DialogRoot } from "./ui/dialog";
+import { Input } from "./ui/input";
+import { MenuItem, MenuPopup, MenuRoot, MenuTrigger } from "./ui/menu";
 
 interface Teammate {
   id: string;
@@ -11,12 +13,18 @@ interface Teammate {
   role: string;
 }
 
+interface TeamDeletePreview {
+  name: string;
+  contestCount: number;
+  printoutCount: number;
+}
+
 type Confirmation =
   | { kind: "transfer"; member: Teammate }
   | { kind: "remove"; member: Teammate }
-  | { kind: "leave" };
-
-type InviteStatus = "idle" | "copying" | "copied" | "reset" | "failed";
+  | { kind: "leave" }
+  | { kind: "reset-invite" }
+  | { kind: "dissolve"; summary: TeamDeletePreview };
 
 function MemberActions({
   member,
@@ -35,211 +43,380 @@ function MemberActions({
   }
 
   return (
-    <Menu.Root onOpenChange={(open) => {
-      if (open) openingDialog.current = false;
-    }}>
-      <Menu.Trigger
-        className="settings-action teams-member-menu"
+    <MenuRoot
+      onOpenChange={(open) => {
+        if (open) openingDialog.current = false;
+      }}
+    >
+      <MenuTrigger
+        className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--text)] vp-hover-surface cursor-pointer max-md:min-h-[44px] max-md:w-11 disabled:opacity-45"
         aria-label={`管理队员 ${member.name}`}
         disabled={pending}
       >
-        管理<ChevronDown size={13} aria-hidden="true" />
-      </Menu.Trigger>
-      <Menu.Portal>
-        <Menu.Positioner className="vp-menu-position" align="end" sideOffset={3}>
-          <Menu.Popup
-            className="vp-menu"
-            aria-label={`管理队员 ${member.name}`}
-            finalFocus={() => !openingDialog.current}
-          >
-            <Menu.Item className="vp-menu-item" onClick={() => choose("transfer")}>
-              转让队长
-            </Menu.Item>
-            <Menu.Item className="vp-menu-item" onClick={() => choose("remove")}>
-              移除队员
-            </Menu.Item>
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </Menu.Root>
+        <MoreHorizontal size={15} aria-hidden="true" />
+      </MenuTrigger>
+      <MenuPopup
+        align="end"
+        ariaLabel={`管理队员 ${member.name}`}
+        finalFocus={() => !openingDialog.current}
+      >
+        <MenuItem onClick={() => choose("transfer")}>转让队长</MenuItem>
+        <MenuItem
+          onClick={() => choose("remove")}
+          className="text-[var(--negative-text)]"
+        >
+          移除队员
+        </MenuItem>
+      </MenuPopup>
+    </MenuRoot>
   );
 }
 
 export function TeamManagement({
   teamId,
+  teamName,
   role,
   invitationUrl,
+  memberId,
+  memberName,
   onInvitationChange,
   onTeamChanged,
-  memberId,
+  onTeamDissolved,
 }: {
   teamId: string;
+  teamName: string;
   role: string;
   invitationUrl: string;
+  memberId: string;
+  memberName: string;
   onInvitationChange: (invitationUrl: string) => void;
   onTeamChanged: () => void;
-  memberId: string;
+  onTeamDissolved: () => void;
 }) {
+  const owner = role === "owner";
+  const [nameDraft, setNameDraft] = useState(teamName);
+  const [savingName, setSavingName] = useState(false);
+
   const [teammates, setTeammates] = useState<Teammate[]>([]);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-  const [inviteStatus, setInviteStatus] = useState<InviteStatus>("idle");
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [inviteStatus, setInviteStatus] = useState<
+    "idle" | "copied" | "reset" | "failed"
+  >("idle");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-  const confirmationDialog = useRef<HTMLDialogElement>(null);
-  const invitationDialog = useRef<HTMLDialogElement>(null);
-  const membersHeading = useRef<HTMLHeadingElement>(null);
-  const owner = role === "owner";
+
+  useEffect(() => {
+    setNameDraft(teamName);
+  }, [teamId, teamName]);
 
   useEffect(() => {
     if (!owner) return;
     let active = true;
-
     api<{ members: Teammate[] }>(`/api/teams/${teamId}/members`)
       .then((body) => {
         if (active) setTeammates(body.members);
       })
       .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : "队员列表加载失败。");
+        if (active)
+          setError(
+            cause instanceof Error ? cause.message : "队员列表加载失败。",
+          );
       });
-
     return () => {
       active = false;
     };
   }, [owner, teamId]);
 
-  useEffect(() => {
-    if (confirmation) confirmationDialog.current?.showModal();
-    else confirmationDialog.current?.close();
-  }, [confirmation]);
-
-  async function run(action: () => Promise<void>) {
-    if (pending) return;
-    setPending(true);
+  async function saveTeamName(event: FormEvent) {
+    event.preventDefault();
+    const trimmed = nameDraft.trim();
+    if (!owner || !trimmed || trimmed === teamName || savingName) return;
+    setSavingName(true);
     setError("");
     try {
-      await action();
+      await api(`/api/teams/${teamId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: trimmed }),
+      });
+      toast.success(`已将队伍更名为「${trimmed}」`);
+      onTeamChanged();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "请求失败，请稍后重试。");
+      setError(cause instanceof Error ? cause.message : "保存队伍名称失败。");
     } finally {
-      setPending(false);
+      setSavingName(false);
     }
   }
 
   async function copyInvitation() {
-    setInviteStatus("copying");
     try {
       await navigator.clipboard.writeText(invitationUrl);
       setInviteStatus("copied");
+      toast.success("已复制队伍邀请链接");
     } catch {
       setInviteStatus("failed");
     }
   }
 
-  async function resetInvitation() {
-    await run(async () => {
-      const body = await api<{ invitationUrl: string }>(`/api/teams/${teamId}/invitation`, {
-        method: "POST",
-        body: "{}",
-      });
-      onInvitationChange(body.invitationUrl);
-      setInviteStatus("reset");
-      setConfirmReset(false);
-    });
+  async function openDissolvePreview() {
+    if (pending) return;
+    setPending(true);
+    setError("");
+    try {
+      const summary = await api<TeamDeletePreview>(
+        `/api/teams/${teamId}/deletion`,
+      );
+      setConfirmation({ kind: "dissolve", summary });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "无法读取解散范围。");
+    } finally {
+      setPending(false);
+    }
   }
 
-  async function confirmAction() {
-    if (!confirmation) return;
-    await run(async () => {
-      if (confirmation.kind === "remove") {
+  async function executeConfirmation() {
+    if (!confirmation || pending) return;
+    setPending(true);
+    setError("");
+    try {
+      if (confirmation.kind === "reset-invite") {
+        const body = await api<{ invitationUrl: string }>(
+          `/api/teams/${teamId}/invitation`,
+          { method: "POST", body: "{}" },
+        );
+        onInvitationChange(body.invitationUrl);
+        setInviteStatus("reset");
+        toast.success("邀请链接已重置，旧链接已失效");
+      } else if (confirmation.kind === "remove") {
         const body = await api<{ invitationUrl: string }>(
           `/api/teams/${teamId}/members/${confirmation.member.id}`,
           { method: "DELETE" },
         );
         onInvitationChange(body.invitationUrl);
-        setTeammates((current) => current.filter((member) => member.id !== confirmation.member.id));
+        setTeammates((current) =>
+          current.filter((m) => m.id !== confirmation.member.id),
+        );
+        toast(`已移除队员 ${confirmation.member.name}`);
       } else if (confirmation.kind === "transfer") {
         await api(`/api/teams/${teamId}/ownership`, {
           method: "PUT",
           body: JSON.stringify({ userId: confirmation.member.id }),
         });
+        toast.success(`已将队长转让给 ${confirmation.member.name}`);
         onTeamChanged();
-      } else {
+      } else if (confirmation.kind === "leave") {
         await api(`/api/teams/${teamId}/membership`, { method: "DELETE" });
-        onTeamChanged();
+        toast("已退出队伍");
+        onTeamDissolved();
+      } else {
+        await api(`/api/teams/${teamId}/deletion`, { method: "DELETE" });
+        toast(`已解散队伍「${confirmation.summary.name}」`);
+        onTeamDissolved();
       }
       setConfirmation(null);
-    });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "操作失败，请稍后重试。");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
-    <div className="vp-settings teams-page">
-      <header className="vp-heading">
-        <div>
-          <h1>队伍设置</h1>
-        </div>
-      </header>
+    <main className="mx-auto max-w-[760px] px-4 py-8 sm:px-6 space-y-6">
+      <div>
+        <a
+          href={`/team/${teamId}`}
+          className={buttonClassName({
+            variant: "ghost",
+            compact: true,
+            className: "-ml-2 mb-1",
+          })}
+        >
+          <ArrowLeft size={14} aria-hidden="true" />
+          <span>返回比赛列表</span>
+        </a>
+        <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)]">
+          队伍设置
+        </h1>
+        <p className="mt-1 text-[13px] text-[var(--muted)]">{teamName}</p>
+      </div>
 
-      <section className="vp-section" aria-labelledby="members-title">
-        <div className="teams-members-heading">
-          <h2 id="members-title" ref={membersHeading} tabIndex={-1}>
-            {owner ? "队员" : "我的身份"}
-            {owner && <span className="vp-tally">{teammates.length}</span>}
-          </h2>
-          {owner && (
+      <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5">
+        <h2 className="text-[14px] font-semibold text-[var(--text)]">队伍名称</h2>
+        {owner ? (
+          <form
+            onSubmit={saveTeamName}
+            className="mt-3 flex flex-wrap items-center gap-2.5"
+          >
+            <label htmlFor="team-name-field" className="sr-only">
+              队伍名称
+            </label>
+            <Input
+              id="team-name-field"
+              name="team_title"
+              maxLength={100}
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              className="flex-1 min-w-[200px]"
+            />
             <Button
-              variant="outline"
-              className="settings-action"
-              aria-haspopup="dialog"
-              onClick={() => {
-                setInviteStatus((status) => (status === "copying" ? status : "idle"));
-                setConfirmReset(false);
-                invitationDialog.current?.showModal();
-              }}
+              type="submit"
+              variant="primary"
+              disabled={
+                savingName ||
+                !nameDraft.trim() ||
+                nameDraft.trim() === teamName
+              }
             >
-              <UserPlus size={15} aria-hidden="true" />邀请队员
+              {savingName ? "保存中…" : "保存名称"}
             </Button>
-          )}
-        </div>
-        <div className="settings-panel">
-          <ul>
-            {owner ? teammates.map((member) => (
-              <li className="vp-row teams-member-row" key={member.id}>
-                <div className="teams-member-name">
-                  <strong>{member.name}</strong>
-                  {member.id === memberId && <span>我</span>}
-                  {member.role === "owner" && <span className="settings-badge">队长</span>}
-                </div>
-                {owner && member.id !== memberId && (
-                  <MemberActions member={member} pending={pending} onChoose={setConfirmation} />
-                )}
-              </li>
-            )) : (
-              <li className="vp-row teams-member-row">
-                <div className="teams-member-name">
-                  <strong>我</strong>
-                  <span className="settings-badge">队员</span>
-                </div>
-              </li>
-            )}
-          </ul>
-        </div>
+          </form>
+        ) : (
+          <p className="mt-2 text-[14px] text-[var(--text)]">{teamName}</p>
+        )}
       </section>
 
-      <section className="vp-section teams-danger-zone" aria-labelledby="team-danger-title">
-        <h2 id="team-danger-title">危险区域</h2>
-        <div className="settings-panel teams-danger-row">
-          <p id="team-danger-impact">
-            {owner
-              ? "解散后，本队的比赛和打印件将永久删除。"
-              : "退出后，你将失去对本队比赛和打印件的访问权限。"}
-          </p>
+      {owner && (
+        <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-[14px] font-semibold text-[var(--text)]">
+                邀请链接
+              </h2>
+              <p className="mt-1 text-[13px] text-[var(--muted)]" role="status">
+                {inviteStatus === "reset"
+                  ? "链接已重置，旧链接已失效。"
+                  : inviteStatus === "copied"
+                    ? "邀请链接已复制。"
+                    : inviteStatus === "failed"
+                      ? "复制失败，请选中链接后手动复制。"
+                      : "同一条链接可邀请多人。"}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              compact
+              disabled={pending}
+              onClick={() => setConfirmation({ kind: "reset-invite" })}
+            >
+              <RefreshCw size={13} aria-hidden="true" />
+              <span>重置链接</span>
+            </Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="team-invite-url" className="sr-only">
+              邀请链接
+            </label>
+            <Input
+              id="team-invite-url"
+              readOnly
+              value={invitationUrl}
+              onFocus={(event) => event.target.select()}
+              className="flex-1 min-w-[200px] vp-code-name"
+            />
+            <Button
+              variant="secondary"
+              disabled={!invitationUrl}
+              onClick={() => void copyInvitation()}
+            >
+              {inviteStatus === "copied" ? (
+                <Check size={14} aria-hidden="true" />
+              ) : (
+                <Copy size={14} aria-hidden="true" />
+              )}
+              <span>{inviteStatus === "copied" ? "已复制" : "复制链接"}</span>
+            </Button>
+          </div>
+        </section>
+      )}
+
+      <section
+        className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] overflow-hidden"
+        aria-labelledby="members-title"
+      >
+        <div className="border-b border-[var(--rule)] px-5 py-3.5">
+          <h2
+            id="members-title"
+            className="text-[14px] font-semibold text-[var(--text)] vp-num"
+          >
+            {owner ? `队员名单 (${teammates.length})` : "我的身份"}
+          </h2>
+        </div>
+        <ul className="divide-y divide-[var(--rule)]">
           {owner ? (
-            <DeleteGroup kind="team" id={teamId} onDeleted={onTeamChanged} />
+            teammates.map((m) => (
+              <li
+                key={m.id}
+                className="teams-member-row flex items-center justify-between gap-3 px-5 py-3.5"
+              >
+                <div className="flex min-w-0 items-center gap-2 text-[14px]">
+                  <strong className="font-medium text-[var(--text)]">
+                    {m.name}
+                  </strong>
+                  {m.id === memberId && (
+                    <span className="text-[12px] text-[var(--faint)]">我</span>
+                  )}
+                  <span className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-2 py-0.5 text-[12px] font-medium text-[var(--muted)]">
+                    {m.role === "owner" ? "队长" : "队员"}
+                  </span>
+                </div>
+                {m.id !== memberId && (
+                  <MemberActions
+                    member={m}
+                    pending={pending}
+                    onChoose={setConfirmation}
+                  />
+                )}
+              </li>
+            ))
+          ) : (
+            <li className="teams-member-row flex items-center justify-between gap-3 px-5 py-3.5">
+              <div className="flex items-center gap-2 text-[14px]">
+                <strong className="font-medium text-[var(--text)]">
+                  {memberName}
+                </strong>
+                <span className="text-[12px] text-[var(--faint)]">我</span>
+                <span className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-2 py-0.5 text-[12px] font-medium text-[var(--muted)]">
+                  队员
+                </span>
+              </div>
+            </li>
+          )}
+        </ul>
+      </section>
+
+      <section
+        className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5"
+        aria-labelledby="team-danger-title"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2
+              id="team-danger-title"
+              className="text-[14px] font-semibold text-[var(--text)]"
+            >
+              {owner ? "解散队伍" : "退出队伍"}
+            </h2>
+            <p
+              id="team-danger-impact"
+              className="mt-1 text-[13px] text-[var(--muted)]"
+            >
+              {owner
+                ? "解散后，本队的比赛和打印件将永久删除。"
+                : "退出后，你将失去对本队比赛和打印件的访问权限。"}
+            </p>
+          </div>
+          {owner ? (
+            <Button
+              variant="danger"
+              aria-describedby="team-danger-impact"
+              disabled={pending}
+              onClick={() => void openDissolvePreview()}
+            >
+              解散队伍
+            </Button>
           ) : (
             <Button
-              variant="outline"
-              className="settings-action teams-danger-action"
+              variant="danger"
               aria-describedby="team-danger-impact"
               disabled={pending}
               onClick={() => setConfirmation({ kind: "leave" })}
@@ -250,153 +427,105 @@ export function TeamManagement({
         </div>
       </section>
 
-      {error && <p className="vp-error" role="alert">{error}</p>}
-
-      {owner && (
-        <dialog
-          ref={invitationDialog}
-          className="vp-dialog teams-invite-dialog"
-          aria-labelledby="team-invite-title"
-          aria-describedby={confirmReset ? "invite-reset-impact" : undefined}
-          onCancel={(event) => {
-            if (pending) { event.preventDefault(); return; }
-            if (confirmReset) {
-              event.preventDefault();
-              setConfirmReset(false);
-            }
-          }}
-          onClose={() => { setConfirmReset(false); setError(""); }}
-        >
-          <header>
-            <h2 id="team-invite-title">{confirmReset ? "重置邀请链接？" : "邀请队员"}</h2>
-            {!confirmReset && (
-              <button
-                type="button"
-                aria-label="关闭"
-                className="invite-close"
-                onClick={() => invitationDialog.current?.close()}
-              >
-                <X size={18} aria-hidden="true" />
-              </button>
-            )}
-          </header>
-          {error && <p className="vp-error" role="alert">{error}</p>}
-          {confirmReset ? (
-            <>
-              <p id="invite-reset-impact">
-                已发出的邀请链接会立即失效，尚未入队的人需要使用新链接。
-              </p>
-              <div className="vp-actions">
-                <Button
-                  variant="outline"
-                  className="settings-action"
-                  disabled={pending}
-                  onClick={() => setConfirmReset(false)}
-                >
-                  取消
-                </Button>
-                <Button className="vp-danger" disabled={pending} onClick={() => void resetInvitation()}>
-                  确认重置
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <label className="vp-field">
-                邀请链接
-                <input readOnly value={invitationUrl} onFocus={(event) => event.target.select()} />
-              </label>
-              <p role="status">
-                {inviteStatus === "reset"
-                  ? "链接已重置，旧链接已失效。"
-                  : inviteStatus === "copied"
-                    ? "邀请链接已复制。"
-                    : inviteStatus === "failed"
-                      ? "复制失败，请选中链接后手动复制。"
-                      : "同一条链接可邀请多人。"}
-              </p>
-              <div className="vp-actions">
-                <Button
-                  variant="outline"
-                  className="settings-action"
-                  disabled={inviteStatus === "copying"}
-                  onClick={() => setConfirmReset(true)}
-                >
-                  <RotateCcw size={15} aria-hidden="true" />重置链接
-                </Button>
-                <Button
-                  className="vp-primary"
-                  disabled={inviteStatus === "copying" || !invitationUrl}
-                  onClick={() => void copyInvitation()}
-                >
-                  {inviteStatus === "copied"
-                    ? <Check size={15} aria-hidden="true" />
-                    : <Copy size={15} aria-hidden="true" />}
-                  {inviteStatus === "copied" ? "已复制" : "复制链接"}
-                </Button>
-              </div>
-            </>
-          )}
-        </dialog>
+      {error && (
+        <p className="text-[13px] text-[var(--negative)]" role="alert">
+          {error}
+        </p>
       )}
 
-      <dialog
-        ref={confirmationDialog}
-        onCancel={event => { if (pending) event.preventDefault(); }}
-        className="vp-dialog"
-        aria-labelledby="team-confirmation-title"
-        onClose={() => {
-          setConfirmation(null);
-          setError("");
-          if (
-            document.activeElement === document.body ||
-            confirmationDialog.current?.contains(document.activeElement)
-          ) {
-            membersHeading.current?.focus({ preventScroll: true });
+      <DialogRoot
+        open={confirmation !== null}
+        onOpenChange={(next) => {
+          if (pending && !next) return;
+          if (!next) {
+            setConfirmation(null);
+            setError("");
           }
         }}
       >
         {confirmation && (
-          <>
-            <h2 id="team-confirmation-title">
-              {confirmation.kind === "transfer"
+          <DialogContent
+            title={
+              confirmation.kind === "transfer"
                 ? "转让队长"
                 : confirmation.kind === "remove"
                   ? "移除队员"
-                  : "退出队伍"}
-            </h2>
-            {error && <p className="vp-error" role="alert">{error}</p>}
-            {confirmation.kind === "transfer" && (
-              <p>
-                将队长转让给「{confirmation.member.name}」。你成为队员，比赛和打印件保持不变。
-              </p>
-            )}
-            {confirmation.kind === "remove" && (
-              <p>
-                移除「{confirmation.member.name}」，并重置邀请链接。对方将不能访问本队比赛。
-              </p>
-            )}
-            {confirmation.kind === "leave" && <p>退出后，原邀请链接继续有效。</p>}
-            <div className="vp-actions">
-              <Button
-                variant="outline"
-                className="vp-secondary"
-                autoFocus disabled={pending}
-                onClick={() => setConfirmation(null)}
-              >
-                取消
-              </Button>
-              <Button
-                className={confirmation.kind === "transfer" ? "vp-primary" : "vp-danger"}
-                disabled={pending}
-                onClick={() => void confirmAction()}
-              >
-                确认
-              </Button>
+                  : confirmation.kind === "reset-invite"
+                    ? "重置邀请链接？"
+                    : confirmation.kind === "dissolve"
+                      ? "解散队伍"
+                      : "退出队伍"
+            }
+            dismissible={!pending}
+          >
+            <div className="space-y-4">
+              {confirmation.kind === "transfer" && (
+                <p className="text-[13px] leading-6 text-[var(--muted)]">
+                  将队长转让给「{confirmation.member.name}
+                  」。你成为队员，比赛和打印件保持不变。
+                </p>
+              )}
+              {confirmation.kind === "remove" && (
+                <p className="text-[13px] leading-6 text-[var(--muted)]">
+                  移除「{confirmation.member.name}
+                  」，并重置邀请链接。对方将不能访问本队比赛。
+                </p>
+              )}
+              {confirmation.kind === "reset-invite" && (
+                <p className="text-[13px] leading-6 text-[var(--muted)]">
+                  已发出的邀请链接会立即失效，尚未入队的人需要使用新链接。
+                </p>
+              )}
+              {confirmation.kind === "leave" && (
+                <p className="text-[13px] leading-6 text-[var(--muted)]">
+                  退出后，原邀请链接继续有效。
+                </p>
+              )}
+              {confirmation.kind === "dissolve" && (
+                <div className="space-y-2 text-[13px] leading-6 text-[var(--muted)]">
+                  <p className="font-medium text-[var(--text)]">
+                    {confirmation.summary.name}
+                  </p>
+                  <p className="vp-num">
+                    {confirmation.summary.contestCount} 场比赛、
+                    {confirmation.summary.printoutCount} 份打印件将永久删除。
+                  </p>
+                </div>
+              )}
+
+              {error && (
+                <p className="text-[13px] text-[var(--negative)]" role="alert">
+                  {error}
+                </p>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="secondary"
+                  autoFocus
+                  disabled={pending}
+                  onClick={() => setConfirmation(null)}
+                >
+                  取消
+                </Button>
+                <Button
+                  variant={
+                    confirmation.kind === "transfer" ? "primary" : "danger"
+                  }
+                  disabled={pending}
+                  onClick={() => void executeConfirmation()}
+                >
+                  {confirmation.kind === "reset-invite"
+                    ? "确认重置"
+                    : confirmation.kind === "dissolve"
+                      ? "确认解散队伍"
+                      : "确认"}
+                </Button>
+              </div>
             </div>
-          </>
+          </DialogContent>
         )}
-      </dialog>
-    </div>
+      </DialogRoot>
+    </main>
   );
 }

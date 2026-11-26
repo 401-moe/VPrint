@@ -847,3 +847,158 @@ test("only the current owner can delete a selected contest and its printouts", a
   expect((await join(memberCookie, team.invitationToken)).status).toBe(404);
 
 });
+
+test("team renaming is owner-only, contest renaming allows teammates, and workspace scopes by teamId", async () => {
+  const suffix = crypto.randomUUID();
+  const [{ cookie: ownerCookie }, { cookie: memberCookie }, { cookie: outsiderCookie }] =
+    await Promise.all([
+      signUp({
+        email: `rename-owner-${suffix}@vprint.example`,
+        password: "correct horse battery staple",
+        name: "队长",
+      }),
+      signUp({
+        email: `rename-member-${suffix}@vprint.example`,
+        password: "correct horse battery staple",
+        name: "队员",
+      }),
+      signUp({
+        email: `rename-outsider-${suffix}@vprint.example`,
+        password: "correct horse battery staple",
+        name: "外人",
+      }),
+    ]);
+
+  const firstTeam = await createTeam(ownerCookie, "一队");
+  const secondTeam = await createTeam(ownerCookie, "二队");
+  await join(memberCookie, firstTeam.invitationToken);
+
+  const contestRes = await worker.fetch(
+    request(`/api/teams/${firstTeam.id}/contests`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: ownerCookie },
+      body: JSON.stringify({ name: "周六热身" }),
+    }),
+    env,
+  );
+  expect(contestRes.status).toBe(201);
+  const contest = (await contestRes.json()) as { id: string };
+
+  const memberTeamRename = await worker.fetch(
+    request(`/api/teams/${firstTeam.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", cookie: memberCookie, origin: loopbackOrigin },
+      body: JSON.stringify({ name: "非法改名" }),
+    }),
+    env,
+  );
+  expect(memberTeamRename.status).toBe(403);
+
+  const emptyTeamRename = await worker.fetch(
+    request(`/api/teams/${firstTeam.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", cookie: ownerCookie, origin: loopbackOrigin },
+      body: JSON.stringify({ name: "   " }),
+    }),
+    env,
+  );
+  expect(emptyTeamRename.status).toBe(400);
+
+  const crossOriginTeamRename = await worker.fetch(
+    request(`/api/teams/${firstTeam.id}`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        cookie: ownerCookie,
+        origin: "https://attacker.example",
+      },
+      body: JSON.stringify({ name: "跨源改名" }),
+    }),
+    env,
+  );
+  expect(crossOriginTeamRename.status).toBe(403);
+
+  const ownerTeamRename = await worker.fetch(
+    request(`/api/teams/${firstTeam.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", cookie: ownerCookie, origin: loopbackOrigin },
+      body: JSON.stringify({ name: "一队（已改名）" }),
+    }),
+    env,
+  );
+  expect(ownerTeamRename.status).toBe(200);
+  expect(await ownerTeamRename.json()).toEqual({ id: firstTeam.id, name: "一队（已改名）" });
+
+  const outsiderContestRename = await worker.fetch(
+    request(`/api/contests/${contest.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", cookie: outsiderCookie, origin: loopbackOrigin },
+      body: JSON.stringify({ name: "越权改名" }),
+    }),
+    env,
+  );
+  expect(outsiderContestRename.status).toBe(403);
+
+  const emptyContestRename = await worker.fetch(
+    request(`/api/contests/${contest.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", cookie: memberCookie, origin: loopbackOrigin },
+      body: JSON.stringify({ name: "" }),
+    }),
+    env,
+  );
+  expect(emptyContestRename.status).toBe(400);
+
+  const crossOriginContestRename = await worker.fetch(
+    request(`/api/contests/${contest.id}`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        cookie: memberCookie,
+        origin: "https://attacker.example",
+      },
+      body: JSON.stringify({ name: "跨源改比赛" }),
+    }),
+    env,
+  );
+  expect(crossOriginContestRename.status).toBe(403);
+
+  const memberContestRename = await worker.fetch(
+    request(`/api/contests/${contest.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", cookie: memberCookie, origin: loopbackOrigin },
+      body: JSON.stringify({ name: "周六热身 · 定稿" }),
+    }),
+    env,
+  );
+  expect(memberContestRename.status).toBe(200);
+  expect(await memberContestRename.json()).toMatchObject({
+    id: contest.id,
+    name: "周六热身 · 定稿",
+    teamId: firstTeam.id,
+  });
+
+  const scopedWs = await worker.fetch(
+    request(`/api/workspace?teamId=${firstTeam.id}`, { headers: { cookie: ownerCookie } }),
+    env,
+  );
+  expect(scopedWs.status).toBe(200);
+  const scopedBody = (await scopedWs.json()) as {
+    selectedTeamId: string;
+    teams: { id: string; name: string; memberCount: number; contestCount: number }[];
+    contests: { id: string; name: string }[];
+  };
+  expect(scopedBody.selectedTeamId).toBe(firstTeam.id);
+  expect(scopedBody.teams.find((t) => t.id === firstTeam.id)).toMatchObject({
+    name: "一队（已改名）",
+    memberCount: 2,
+    contestCount: 1,
+  });
+  expect(scopedBody.contests.map((c) => c.name)).toEqual(["周六热身 · 定稿"]);
+
+  const outsiderTeamScope = await worker.fetch(
+    request(`/api/workspace?teamId=${secondTeam.id}`, { headers: { cookie: memberCookie } }),
+    env,
+  );
+  expect(outsiderTeamScope.status).toBe(403);
+});

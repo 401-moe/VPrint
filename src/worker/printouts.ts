@@ -20,6 +20,7 @@ interface PrintoutRow {
   id: string;
   filename: string;
   createdAt: number;
+  authorName: string | null;
 }
 
 function uuid(value: string) {
@@ -171,10 +172,11 @@ printoutsRoutes.get("/contests/:contestId/prints", async (context) => {
   const contestId = context.req.param("contestId");
   const printouts = await context.env.DB.prepare(
     `
-      SELECT printout.id, printout.filename, printout.createdAt
+      SELECT printout.id, printout.filename, printout.createdAt, user.name AS authorName
       FROM printout
       JOIN contest ON contest.id = printout.contestId
       JOIN team_member ON team_member.teamId = contest.teamId
+      LEFT JOIN user ON user.id = printout.userId
       WHERE printout.contestId = ? AND team_member.userId = ?
       ORDER BY printout.createdAt DESC, printout.id DESC
     `,
@@ -194,15 +196,16 @@ printoutsRoutes.get("/contests/:contestId/prints/:printId", async (context) => {
   }
   const printout = await context.env.DB.prepare(
     `
-      SELECT printout.filename, printout.createdAt, printout.content
+      SELECT printout.filename, printout.createdAt, printout.content, user.name AS authorName
       FROM printout
       JOIN contest ON contest.id = printout.contestId
       JOIN team_member ON team_member.teamId = contest.teamId
+      LEFT JOIN user ON user.id = printout.userId
       WHERE printout.id = ? AND printout.contestId = ? AND team_member.userId = ?
     `,
   )
     .bind(printId, contestId, user.id)
-    .first<{ filename: string; createdAt: number; content: string }>();
+    .first<{ filename: string; createdAt: number; content: string; authorName: string | null }>();
   if (!printout) return context.text("", 404);
   return context.json(printout);
 });

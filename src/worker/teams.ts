@@ -7,6 +7,8 @@ interface TeamRow {
   role: string;
   createdAt: number;
   invitationToken?: string;
+  memberCount?: number;
+  contestCount?: number;
 }
 
 interface TeamResponseRow extends TeamRow {
@@ -211,8 +213,12 @@ teamsRoutes.get("/workspace", async (context) => {
   const user = await requireUser(context);
   if (!user) return context.json({ error: "authentication required" }, 401);
   const requestedContestId = context.req.query("contestId");
+  const requestedTeamId = context.req.query("teamId");
   if (requestedContestId && !teamId(requestedContestId)) {
     return context.json({ error: "contest not found" }, 403);
+  }
+  if (!requestedContestId && requestedTeamId && !teamId(requestedTeamId)) {
+    return context.json({ error: "team not found" }, 403);
   }
 
   if (requestedContestId) {
@@ -227,11 +233,20 @@ teamsRoutes.get("/workspace", async (context) => {
       .bind(requestedContestId, user.id)
       .first<{ id: string }>();
     if (!membership) return context.json({ error: "contest not found" }, 403);
+  } else if (requestedTeamId) {
+    const membership = await context.env.DB.prepare(
+      "SELECT teamId FROM team_member WHERE teamId = ? AND userId = ?",
+    )
+      .bind(requestedTeamId, user.id)
+      .first<{ teamId: string }>();
+    if (!membership) return context.json({ error: "team not found" }, 403);
   }
 
   const teams = await context.env.DB.prepare(
     `
-      SELECT team.id, team.name, team_member.role, team.createdAt, team.invitationToken
+      SELECT team.id, team.name, team_member.role, team.createdAt, team.invitationToken,
+        (SELECT COUNT(*) FROM team_member m2 WHERE m2.teamId = team.id) AS memberCount,
+        (SELECT COUNT(*) FROM contest c2 WHERE c2.teamId = team.id) AS contestCount
       FROM team_member
       JOIN team ON team.id = team_member.teamId
       WHERE team_member.userId = ?
@@ -262,6 +277,9 @@ teamsRoutes.get("/workspace", async (context) => {
     if (!contest) return context.json({ error: "contest not found" }, 403);
 
     selectedTeam = teams.results.find((team) => team.id === contest?.teamId);
+  } else if (requestedTeamId) {
+    selectedTeam = teams.results.find((team) => team.id === requestedTeamId);
+    if (!selectedTeam) return context.json({ error: "team not found" }, 403);
   }
 
   if (!selectedTeam) {
@@ -301,6 +319,8 @@ teamsRoutes.get("/workspace", async (context) => {
       name: team.name,
       role: team.role,
       createdAt: team.createdAt,
+      memberCount: Number(team.memberCount ?? 0),
+      contestCount: Number(team.contestCount ?? 0),
       invitationUrl:
         team.role === "owner" ? invitationUrl(context.env, team.invitationToken ?? "") : "",
     })),

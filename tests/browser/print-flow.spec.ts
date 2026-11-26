@@ -15,11 +15,12 @@ test("a member authorizes a real CLI and reads its print on phones and desktops"
   await page.getByLabel("邮箱").fill(`print-flow-${crypto.randomUUID()}@vprint.example`);
   await page.getByLabel("设置密码").fill(password);
   await page.getByRole("button", { name: "创建并进入" }).click();
-  await expect(page.getByRole("heading", { name: "比赛工作台" })).toBeVisible();
-  await page.getByRole("button", { name: "新建队伍" }).click();
+  await expect(page.getByRole("heading", { name: "我的队伍" })).toBeVisible();
+  await page.getByRole("button", { name: "新建队伍" }).first().click();
   await page.getByLabel("队伍名称").fill(name);
   await page.getByRole("button", { name: "创建队伍", exact: true }).click();
-  await page.getByRole("button", { name: "新建比赛" }).click();
+  await expect(page.getByRole("heading", { name: "比赛列表" })).toBeVisible();
+  await page.getByRole("button", { name: "新建比赛" }).first().click();
   await page.getByLabel("比赛名称").fill(name);
   await page.getByRole("button", { name: "创建比赛", exact: true }).click();
   const contest = page.getByRole("list", { name: "比赛" }).getByRole("link", { name: new RegExp(name) });
@@ -54,6 +55,7 @@ test("a member authorizes a real CLI and reads its print on phones and desktops"
 
     await page.goto("/");
     await page.getByRole("link", { name: "进入训练工作区" }).click();
+    await page.getByRole("link", { name }).first().click();
     await contest.click();
     const firstLink = page.getByRole("link", { name: /solver\.cpp/ });
     await expect(firstLink).toBeVisible();
@@ -64,7 +66,7 @@ test("a member authorizes a real CLI and reads its print on phones and desktops"
     await expect(page.getByText("本场比赛有新打印件")).toBeVisible();
     await expect(page.getByRole("region", { name: "源码" })).toContainText(firstSource.content.trimEnd());
     await expect(page.getByRole("heading", { name: firstSource.filename })).toBeVisible();
-    await page.getByRole("link", { name: "返回列表" }).click();
+    await page.getByRole("link", { name: "返回打印列表" }).click();
     const secondLink = page.getByRole("link", { name: /reader\.cpp/ });
     await expect(secondLink).toBeVisible();
     await secondLink.click();
