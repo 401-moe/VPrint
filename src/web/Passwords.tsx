@@ -95,7 +95,7 @@ export function PasswordReset({
   return (
     <div>
       <header className="mb-5">
-        <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)]">
+        <h1 className="vp-page-title">
           {done ? "密码已更新" : firstPassword ? "设置密码" : "重置密码"}
         </h1>
         <p className="mt-1 text-[13px] text-[var(--muted)]">
@@ -105,7 +105,7 @@ export function PasswordReset({
         </p>
       </header>
 
-      <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6">
+      <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] vp-form-padding">
         {done ? (
           <div className="space-y-4" role="status">
             <p className="text-[13px] text-[var(--text)]">

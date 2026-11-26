@@ -226,7 +226,7 @@ export function PrintList({
                 <li key={record.id}>
                   <a
                     onClick={navigate}
-                    className="ft-link flex w-full items-center justify-between gap-4 px-5 py-3 vp-hover-row min-h-[46px] max-md:min-h-[48px]"
+                    className="ft-link flex w-full items-center justify-between gap-4 px-5 py-3 vp-hover-row min-h-[46px] pointer-coarse:min-h-[48px]"
                     href={`${contestHref}/print/${record.id}`}
                   >
                     <span className="flex min-w-0 items-center gap-3">
@@ -377,7 +377,7 @@ export function ContestSettings({
         <h2 className="text-[14px] font-semibold text-[var(--text)]">比赛名称</h2>
         <form
           onSubmit={saveContestName}
-          className="mt-3 flex flex-wrap items-center gap-2.5"
+          className="mt-3 flex items-center gap-2.5"
         >
           <label htmlFor="contest-name-field" className="sr-only">
             比赛名称
@@ -388,7 +388,7 @@ export function ContestSettings({
             maxLength={100}
             value={nameDraft}
             onChange={(e) => setNameDraft(e.target.value)}
-            className="flex-1 min-w-[200px]"
+            className="min-w-0 flex-1"
           />
           <Button
             type="submit"
@@ -403,8 +403,8 @@ export function ContestSettings({
       </section>
 
       <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
             <h2 className="text-[14px] font-semibold text-[var(--text)]">
               CLI 目录绑定
             </h2>
@@ -434,8 +434,8 @@ export function ContestSettings({
 
       {owner && (
         <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
               <h2 className="text-[14px] font-semibold text-[var(--text)]">
                 删除比赛
               </h2>

@@ -2,7 +2,7 @@ import { forwardRef, type ComponentPropsWithoutRef } from "react";
 import { cn } from "./cn";
 
 const BASE_INPUT_CLASS =
-  "h-9 w-full rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--input-bg)] px-3 text-[16px] md:text-[14px] text-[var(--text)] placeholder:text-[var(--faint)] disabled:opacity-60 max-md:min-h-[44px]";
+  "h-9 w-full rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--input-bg)] px-3 text-[14px] pointer-coarse:text-[16px] text-[var(--text)] placeholder:text-[var(--faint)] disabled:opacity-60 pointer-coarse:min-h-11";
 
 /**
  * Input for non-identity entity fields (team names, contest names, device codes).

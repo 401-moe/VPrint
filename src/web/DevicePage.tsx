@@ -100,7 +100,7 @@ export function DevicePage({ email }: { email: string }) {
           id="device-title"
           ref={heading}
           tabIndex={-1}
-          className="text-[22px] sm:text-[24px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)] outline-none"
+          className="vp-page-title outline-none"
         >
           {result === "approved"
             ? "已批准主机登录"
@@ -118,7 +118,7 @@ export function DevicePage({ email }: { email: string }) {
       </header>
 
       <section
-        className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
+        className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] vp-form-padding"
         aria-labelledby="device-title"
       >
         {result ? (
@@ -172,7 +172,7 @@ export function DevicePage({ email }: { email: string }) {
               </div>
             </dl>
 
-            <label className="flex items-center gap-2.5 text-[13px] text-[var(--text)] cursor-pointer select-none max-md:min-h-[44px]">
+            <label className="flex items-center gap-2.5 text-[13px] text-[var(--text)] cursor-pointer select-none pointer-coarse:min-h-11">
               <input
                 type="checkbox"
                 checked={remember}

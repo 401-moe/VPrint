@@ -153,6 +153,28 @@ test("contest settings allow renaming and owner deletion confirmation", async ({
   await expect(preview).toHaveCSS("text-overflow", "ellipsis");
   await expect(preview).toHaveCSS("overflow-x", "hidden");
   await expectCopy(page, "复制命令", command);
+
+  const viewport = page.viewportSize()!;
+  const field = page.getByLabel("比赛名称");
+  let previous: { width: number; x: number; height: number } | undefined;
+  for (const width of [769, 768, 767, 639, 640, 641, 320, 768]) {
+    await page.setViewportSize({ ...viewport, width });
+    const geometry = await field.evaluate((input) => {
+      const field = input.getBoundingClientRect();
+      const button = input.closest("form")!.querySelector("button")!.getBoundingClientRect();
+      return { x: field.x, height: button.height, sameRow: button.left >= field.right && button.top < field.bottom };
+    });
+    expect(geometry.sameRow).toBe(true);
+    if (previous) {
+      expect(geometry.height).toBe(previous.height);
+      if (Math.abs(previous.width - width) === 1) {
+        expect(Math.abs(geometry.x - previous.x)).toBeLessThanOrEqual(1);
+      }
+    }
+    previous = { width, ...geometry };
+  }
+  await page.setViewportSize(viewport);
+
   await page.getByLabel("比赛名称").fill("确认删除");
   await page.getByRole("button", { name: "保存名称" }).click();
   await expect(page.getByText("比赛管理 · 确认删除")).toBeVisible();

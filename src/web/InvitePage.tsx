@@ -112,7 +112,7 @@ export function InvitePage({
           </h1>
           <p className="mt-1 text-[13px] text-[var(--muted)]">这条邀请链接无效。</p>
         </header>
-        <section className="max-w-[520px] rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6 space-y-4">
+        <section className="max-w-[520px] rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] vp-form-padding space-y-4">
           <p className="text-[13px] text-[var(--negative)]">
             邀请不存在或已被重置。请向队伍队长索取新的邀请链接。
           </p>

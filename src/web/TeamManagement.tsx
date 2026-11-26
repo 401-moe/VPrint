@@ -50,7 +50,7 @@ function MemberActions({
       }}
     >
       <MenuTrigger
-        className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--text)] vp-hover-surface cursor-pointer max-md:min-h-[44px] max-md:w-11 disabled:opacity-45"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--text)] vp-hover-surface cursor-pointer pointer-coarse:min-h-11 pointer-coarse:w-11 disabled:opacity-45"
         aria-label={`管理队员 ${member.name}`}
         disabled={pending}
       >
@@ -234,7 +234,7 @@ export function TeamManagement({
         {owner ? (
           <form
             onSubmit={saveTeamName}
-            className="mt-3 flex flex-wrap items-center gap-2.5"
+            className="mt-3 flex items-center gap-2.5"
           >
             <label htmlFor="team-name-field" className="sr-only">
               队伍名称
@@ -245,7 +245,7 @@ export function TeamManagement({
               maxLength={100}
               value={nameDraft}
               onChange={(e) => setNameDraft(e.target.value)}
-              className="flex-1 min-w-[200px]"
+              className="min-w-0 flex-1"
             />
             <Button
               type="submit"
@@ -285,7 +285,7 @@ export function TeamManagement({
               <span>重置链接</span>
             </Button>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
             <label htmlFor="team-invite-url" className="sr-only">
               邀请链接
             </label>
@@ -294,7 +294,7 @@ export function TeamManagement({
               readOnly
               value={invitationUrl}
               onFocus={(event) => event.target.select()}
-              className="flex-1 min-w-[200px] vp-code-name"
+              className="min-w-0 flex-1 vp-code-name"
             />
             <CopyButton value={invitationUrl} label="复制链接" />
           </div>
@@ -360,8 +360,8 @@ export function TeamManagement({
         className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5"
         aria-labelledby="team-danger-title"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <h2
               id="team-danger-title"
               className="text-[14px] font-semibold text-[var(--text)]"

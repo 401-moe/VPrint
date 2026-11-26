@@ -1,5 +1,19 @@
 @import "tailwindcss" source("./");
 
+@font-face {
+  font-family: "Geist";
+  src: url("./fonts/Geist.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: optional;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("./fonts/GeistMono.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: optional;
+}
+
 :root {
   --z-dropdown: 100;
   --z-modal: 200;
@@ -68,7 +82,7 @@ body :is(input, select, textarea):focus-visible {
 
 .vp-frame,
 .vp-page {
-  --page-gutter: 1rem;
+  --page-gutter: clamp(1rem, 0.5rem + 2vw, 1.5rem);
   width: 100%;
   max-width: 1080px;
   margin-inline: auto;
@@ -88,20 +102,20 @@ body :is(input, select, textarea):focus-visible {
 }
 
 .vp-page-title {
-  font-size: 1.375rem;
+  font-size: clamp(1.375rem, 1.25rem + 0.5vw, 1.5rem);
   font-weight: 600;
   line-height: 1.25;
   letter-spacing: -0.02em;
   color: var(--text);
 }
 
-@media (min-width: 40rem) {
-  .vp-frame, .vp-page { --page-gutter: 1.5rem; }
-  .vp-page-title { font-size: 1.5rem; }
+.vp-form-padding {
+  padding: clamp(1.25rem, 1rem + 1vw, 1.5rem);
 }
 
-@media (min-width: 48rem) {
-  :root { scrollbar-gutter: stable both-edges; }
+/* Window width controls layout. Pointer precision controls hit areas. */
+@media (pointer: fine) {
+  :root { scrollbar-gutter: stable; }
   .vp-page-back { inset-block-start: 1rem; }
 }
 

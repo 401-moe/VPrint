@@ -30,7 +30,7 @@ export function BreadcrumbHeader({
         >
           <a
             href="/"
-            className="-ml-1.5 inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-1.5 py-1 font-semibold text-[var(--text)] vp-hover-surface max-md:min-h-[44px]"
+            className="-ml-1.5 inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-1.5 py-1 font-semibold text-[var(--text)] vp-hover-surface pointer-coarse:min-h-11"
           >
             <Printer size={15} className="text-[var(--muted)]" aria-hidden="true" />
             <span>VPrint</span>
@@ -43,7 +43,7 @@ export function BreadcrumbHeader({
               </span>
               <a
                 href="/workspace"
-                className={`shrink-0 rounded-[var(--radius-control)] px-1.5 py-1 vp-hover-surface max-md:min-h-[44px] inline-flex items-center ${
+                className={`shrink-0 rounded-[var(--radius-control)] px-1.5 py-1 vp-hover-surface pointer-coarse:min-h-11 inline-flex items-center ${
                   !team && !contest && !accountActive
                     ? "font-medium text-[var(--text)]"
                     : "text-[var(--muted)] hover:text-[var(--text)]"
@@ -61,7 +61,7 @@ export function BreadcrumbHeader({
               </span>
               <a
                 href={`/team/${team.id}`}
-                className={`max-w-[180px] sm:max-w-[260px] truncate rounded-[var(--radius-control)] px-1.5 py-1 vp-hover-surface max-md:min-h-[44px] inline-flex items-center ${
+                className={`max-w-[min(40vw,260px)] truncate rounded-[var(--radius-control)] px-1.5 py-1 vp-hover-surface pointer-coarse:min-h-11 inline-flex items-center ${
                   !contest
                     ? "font-medium text-[var(--text)]"
                     : "text-[var(--muted)] hover:text-[var(--text)]"
@@ -90,7 +90,7 @@ export function BreadcrumbHeader({
         {memberName && (
           <a
             href="/account"
-            className={`shrink-0 rounded-[var(--radius-control)] px-2 py-1 text-[13px] vp-hover-surface max-md:min-h-[44px] inline-flex items-center ${
+            className={`shrink-0 rounded-[var(--radius-control)] px-2 py-1 text-[13px] vp-hover-surface pointer-coarse:min-h-11 inline-flex items-center ${
               accountActive
                 ? "font-medium text-[var(--text)]"
                 : "text-[var(--muted)] hover:text-[var(--text)]"

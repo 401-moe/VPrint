@@ -61,7 +61,7 @@ export function MenuItem({
     <BaseMenu.Item
       onClick={onClick}
       className={cn(
-        "flex items-center gap-2 min-h-[34px] max-md:min-h-[44px] px-2.5 py-1.5 rounded-[var(--radius-control)] cursor-pointer outline-none text-[var(--text)] data-[highlighted]:bg-[var(--raised)]",
+        "flex items-center gap-2 min-h-[34px] pointer-coarse:min-h-11 px-2.5 py-1.5 rounded-[var(--radius-control)] cursor-pointer outline-none text-[var(--text)] data-[highlighted]:bg-[var(--raised)]",
         className,
       )}
     >

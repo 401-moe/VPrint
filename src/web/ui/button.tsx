@@ -25,10 +25,10 @@ export function buttonClassName({
   className?: string;
 } = {}) {
   return cn(
-    "vp-btn-press inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] font-medium whitespace-nowrap cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed",
+    "vp-btn-press inline-flex h-8 items-center justify-center gap-1.5 rounded-[var(--radius-control)] text-[13px] font-medium whitespace-nowrap pointer-coarse:min-h-11 cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed",
     compact
-      ? "h-8 px-2.5 text-[13px] max-md:min-h-[44px] max-md:px-3"
-      : "h-8 px-3 text-[13px] max-md:min-h-[44px] max-md:px-3.5",
+      ? "px-2.5 pointer-coarse:px-3"
+      : "px-3 pointer-coarse:px-3.5",
     variantStyles[variant],
     className,
   );

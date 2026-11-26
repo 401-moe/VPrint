@@ -84,7 +84,7 @@ export function UserTeamsPage({
               <li key={team.id}>
                 <a
                   href={`/team/${team.id}`}
-                  className="flex w-full items-center justify-between gap-4 px-5 py-4 vp-hover-row max-md:min-h-[56px]"
+                  className="flex w-full items-center justify-between gap-4 px-5 py-4 vp-hover-row pointer-coarse:min-h-[56px]"
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -230,7 +230,7 @@ export function TeamContestsPage({
               <li key={contest.id}>
                 <a
                   href={contestPath(team.id, contest.id)}
-                  className="flex w-full items-center justify-between gap-4 px-5 py-3.5 vp-hover-row min-h-[46px] max-md:min-h-[48px]"
+                  className="flex w-full items-center justify-between gap-4 px-5 py-3.5 vp-hover-row min-h-[46px] pointer-coarse:min-h-[48px]"
                 >
                   <span className="min-w-0 font-medium text-[var(--text)]">
                     {contest.name}

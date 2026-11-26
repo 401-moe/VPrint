@@ -330,7 +330,7 @@ export function App() {
         <BreadcrumbHeader />
         <main className="mx-auto max-w-[440px] px-4 py-10">
           <header className="mb-5">
-            <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)]">
+            <h1 className="vp-page-title">
               {mode === "signup" ? "创建 VPrint 账号" : "登录训练工作区"}
             </h1>
             <p className="mt-1 text-[13px] text-[var(--muted)]">
@@ -341,7 +341,7 @@ export function App() {
           </header>
 
           <section
-            className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
+            className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] vp-form-padding"
             aria-labelledby="login-panel-title"
           >
             <div

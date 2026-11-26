@@ -68,7 +68,7 @@ export function GithubChoice({ member }: { member: { email: string } | null }) {
       <BreadcrumbHeader />
       <main className="mx-auto max-w-[460px] px-4 py-10">
         <header className="mb-5">
-          <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)]">
+          <h1 className="vp-page-title">
             确认 GitHub 账号
           </h1>
           <p className="mt-1 text-[13px] text-[var(--muted)]">
@@ -76,7 +76,7 @@ export function GithubChoice({ member }: { member: { email: string } | null }) {
           </p>
         </header>
 
-        <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6 space-y-4">
+        <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] vp-form-padding space-y-4">
           {choice ? (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--ground)] px-3.5 py-2.5 text-[13px]">
