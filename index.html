@@ -17,13 +17,6 @@
     <link rel="preload" href="/src/web/fonts/Geist.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/src/web/fonts/GeistMono.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/src/web/landing/page.css" />
-    <!-- Vite injects the built stylesheet later in head; keep the no-JS fallback authoritative. -->
-    <noscript><style>
-      .demo-run, .command button, .try-empty, .demo-status { display: none !important; }
-      .landing .try-received { opacity: 1 !important; visibility: visible !important; }
-      .start-reading-story { height: auto !important; }
-      .story-sticky { position: relative !important; top: 0 !important; }
-    </style></noscript>
   </head>
   <body>
     <div class="landing" id="top">
@@ -53,7 +46,7 @@
           </div>
           <div class="start-demo-perspective">
             <div class="start-demo-intro">
-              <div class="try-panel" id="experience" data-phase="idle">
+              <div class="try-panel" id="experience">
                 <div class="demo-topline">
                   <span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-terminal" aria-hidden="true"><path d="M12 19h8"></path><path d="m4 17 6-6-6-6"></path></svg>比赛主机</span><span>周六训练</span>
                 </div>
@@ -220,10 +213,10 @@
                 </p>
                 <div class="guide-commands">
                   <div class="command light">
-                    <code><span aria-hidden="true">$ </span>vprint login</code><button disabled aria-label="复制 vprint login" title="复制命令"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button><span class="sr-only" role="status"></span>
+                    <code><span aria-hidden="true">$ </span>vprint login</code><button hidden disabled aria-label="复制 vprint login" title="复制命令"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button><span class="sr-only" role="status"></span>
                   </div>
                   <div class="command light">
-                    <code><span aria-hidden="true">$ </span>vprint use</code><button disabled aria-label="复制 vprint use" title="复制命令"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button><span class="sr-only" role="status"></span>
+                    <code><span aria-hidden="true">$ </span>vprint use</code><button hidden disabled aria-label="复制 vprint use" title="复制命令"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button><span class="sr-only" role="status"></span>
                   </div>
                 </div>
               </div>
@@ -238,7 +231,7 @@
                   队友打开比赛，就能看到新的打印件。
                 </p>
                 <div class="command light">
-                  <code><span aria-hidden="true">$ </span>vprint A.cpp</code><button disabled aria-label="复制 vprint A.cpp" title="复制命令"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button><span class="sr-only" role="status"></span>
+                  <code><span aria-hidden="true">$ </span>vprint A.cpp</code><button hidden disabled aria-label="复制 vprint A.cpp" title="复制命令"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button><span class="sr-only" role="status"></span>
                 </div>
               </div>
             </li>

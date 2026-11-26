@@ -7,6 +7,23 @@ const printStatus = (page: Page) => page.locator("[data-print-status]");
 const runButton = (page: Page) => page.getByRole("button", { name: "运行打印演示" });
 const receivedPanel = (page: Page) => page.locator(".try-received");
 
+async function expectStaticLanding(page: Page) {
+  const heading = page.getByRole("heading", { level: 1 });
+  await expect(heading).toContainText("少一次传文件");
+  await expect(heading).toContainText("多一个人想题");
+  await expect(sampleRegion(page)).toBeVisible();
+  await expect(sampleRegion(page)).toContainText("return dist[u];");
+  await expect(runButton(page)).toBeHidden();
+  await expect(page.locator(".try-empty")).toBeHidden();
+  await expect(page.locator(".demo-status")).toBeHidden();
+  for (const button of await page.locator(".command button").all()) {
+    await expect(button).toBeHidden();
+  }
+  await expect(page.locator(".story-sticky")).toHaveCSS("position", "relative");
+  await expect(page.getByRole("link", { name: "进入工作区", exact: true })).toHaveAttribute("href", "/workspace");
+  await expect(page.getByRole("link", { name: "开始一场训练" }).first()).toHaveAttribute("href", "/workspace");
+}
+
 async function expectDelivered(page: Page) {
   await expect(page.locator(".try-panel")).toHaveAttribute("data-phase", "received");
   await expect(printStatus(page)).toHaveText("已送达");
@@ -32,11 +49,7 @@ test.describe("public homepage", () => {
 
   test("a guest can read the headline and sample and reach the workspace", async ({ page }) => {
     await page.goto("/");
-    const heading = page.getByRole("heading", { level: 1 });
-    await expect(heading).toContainText("少一次传文件");
-    await expect(heading).toContainText("多一个人想题");
-    await expect(page.getByRole("link", { name: "进入工作区" })).toHaveAttribute("href", "/workspace");
-    await expect(page.getByRole("link", { name: "开始一场训练" }).first()).toHaveAttribute("href", "/workspace");
+    await expectStaticLanding(page);
     await expect(readingLink(page)).toHaveAttribute("href", "#shared-reading");
     // The navigation links are hidden below the desktop breakpoint, so only a
     // desktop viewport can follow the anchor; both projects still check the href.
@@ -45,9 +58,6 @@ test.describe("public homepage", () => {
       await expect(page).toHaveURL(/#shared-reading$/);
       await expect(page.locator("#shared-reading")).toBeInViewport();
     }
-    await expect(sampleRegion(page).first()).toContainText("return dist[u];");
-    await expect(sampleRegion(page).first()).toBeVisible();
-    await expect(runButton(page)).toBeHidden();
     // The production page must not ship the prototype switcher or its variant hooks.
     await expect(page.locator(".proto-picker, [data-variant], [data-active], .direction-start")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "登录训练工作区" })).toHaveCount(0);
@@ -57,6 +67,24 @@ test.describe("public homepage", () => {
 test.describe("public homepage with JavaScript", () => {
   test.use({ javaScriptEnabled: true });
 
+  test("a failed entry script keeps the sample readable and the workspace link usable", async ({ page }) => {
+    const failedScripts: string[] = [];
+    await page.route("**/*.js", route => {
+      failedScripts.push(route.request().url());
+      return route.fulfill({ status: 503, contentType: "text/javascript", body: "" });
+    });
+    await page.goto("/");
+    const entry = await page.locator('script[type="module"][src]').getAttribute("src");
+    expect(entry).not.toBeNull();
+    expect(failedScripts).toContain(new URL(entry!, page.url()).href);
+    await expectStaticLanding(page);
+
+    await page.unroute("**/*.js");
+    await page.getByRole("link", { name: "进入工作区", exact: true }).click();
+    await expect(page).toHaveURL(/\/workspace$/);
+    await expect(page.getByRole("heading", { name: "登录训练工作区", exact: true })).toBeVisible();
+  });
+
   test("a printout arrives in a single reader without shifting the page", async ({ page }) => {
     await page.goto("/");
     const panel = page.locator(".try-panel");
@@ -65,6 +93,9 @@ test.describe("public homepage with JavaScript", () => {
     await expect(page.locator(".try-empty")).toBeVisible();
     await expect(receivedPanel(page)).toBeHidden();
     await expect(runButton(page)).toBeEnabled();
+    await expect(page.locator(".story-sticky")).toHaveCSS(
+      "position", test.info().project.name === "desktop" ? "sticky" : "relative",
+    );
 
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
     const before = await layout(page);
@@ -96,6 +127,7 @@ test.describe("public homepage with JavaScript", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
     await expect(runButton(page)).toBeEnabled();
+    await expect(page.locator(".story-sticky")).toHaveCSS("position", "relative");
     await runButton(page).click();
     await expectDelivered(page);
     await expect(page.locator(".try-empty")).toBeHidden();

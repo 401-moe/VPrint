@@ -41,12 +41,14 @@ for (const command of root.querySelectorAll<HTMLElement>(".command")) {
     }, 1800);
     timers.add(timer);
   }, { signal: events.signal });
+  button.hidden = false;
 }
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     events.abort();
     timers.forEach(clearTimeout);
+    root.querySelectorAll<HTMLButtonElement>(".command button").forEach(button => { button.hidden = true; });
     disposeMotion();
     disposePrint();
   });

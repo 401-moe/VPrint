@@ -41,9 +41,13 @@ export function setupPageMotion(root: HTMLElement) {
     };
   }, root);
 
-  media.add({ desktop: "(min-width: 800px)", mobile: "(max-width: 799px)", reduce: "(prefers-reduced-motion: reduce)" }, context => {
-    const { desktop, reduce } = context.conditions!;
+  media.add({ desktop: "(min-width: 800px)", mobile: "(max-width: 799px)", pinned: "(min-width: 800px) and (min-height: 721px)", reduce: "(prefers-reduced-motion: reduce)" }, context => {
+    const { desktop, pinned, reduce } = context.conditions!;
     if (reduce) return;
+    if (pinned) {
+      gsap.set(".start-reading-story", { height: 1040 });
+      gsap.set(".story-sticky", { position: "sticky", top: 20 });
+    }
     gsap.timeline({
       defaults: { ease: "none", duration: 1 },
       scrollTrigger: {
@@ -125,5 +129,8 @@ export function setupPrintDemo(panel: HTMLElement) {
   return () => {
     events.abort();
     context.revert();
+    delete panel.dataset.phase;
+    paper.inert = false;
+    paper.removeAttribute("aria-hidden");
   };
 }
