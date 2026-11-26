@@ -419,13 +419,13 @@ export function ContestSettings({
             安装 CLI
           </a>
         </div>
-        <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--ground)] px-3 py-2">
+        <div className="flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--ground)] px-3 py-2">
           <Terminal
             size={14}
             className="shrink-0 text-[var(--muted)]"
             aria-hidden="true"
           />
-          <code className="min-w-0 flex-1 break-words text-[13px] text-[var(--text)]">
+          <code className="min-w-0 flex-1 truncate text-[13px] text-[var(--text)]">
             {cliCommand}
           </code>
           <CopyButton value={cliCommand} label="复制命令" />

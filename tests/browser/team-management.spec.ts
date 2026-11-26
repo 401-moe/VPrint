@@ -147,7 +147,12 @@ test("contest settings allow renaming and owner deletion confirmation", async ({
   await page.getByRole("link", { name: "比赛设置" }).click();
   await expect(page.getByRole("heading", { name: "比赛设置" })).toBeVisible();
   const [, , teamId, , contestId] = new URL(page.url()).pathname.split("/");
-  await expectCopy(page, "复制命令", `vprint use --team ${teamId} --contest ${contestId}`);
+  const command = `vprint use --team ${teamId} --contest ${contestId}`;
+  const preview = page.getByText(command, { exact: true });
+  await expect(preview).toHaveCSS("white-space", "nowrap");
+  await expect(preview).toHaveCSS("text-overflow", "ellipsis");
+  await expect(preview).toHaveCSS("overflow-x", "hidden");
+  await expectCopy(page, "复制命令", command);
   await page.getByLabel("比赛名称").fill("确认删除");
   await page.getByRole("button", { name: "保存名称" }).click();
   await expect(page.getByText("比赛管理 · 确认删除")).toBeVisible();
