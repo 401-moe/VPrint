@@ -7,7 +7,7 @@ import kotlin from "highlight.js/lib/languages/kotlin";
 import rust from "highlight.js/lib/languages/rust";
 import go from "highlight.js/lib/languages/go";
 import javascript from "highlight.js/lib/languages/javascript";
-import { grammarForFilename } from "./LanguageIcon";
+import { grammarForFilename } from "./file-language";
 
 for (const [name, language] of Object.entries({
   cpp,

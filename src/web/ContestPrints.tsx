@@ -2,7 +2,7 @@ import { type FormEvent, lazy, type MouseEventHandler, Suspense, useEffect, useR
 import { ArrowLeft, Copy, Settings, Terminal, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "./api";
-import { LanguageIcon, languageForFilename } from "./LanguageIcon";
+import { languageForFilename } from "./file-language";
 import { Button, buttonClassName } from "./ui/button";
 import { DialogContent, DialogRoot } from "./ui/dialog";
 import { Input } from "./ui/input";
@@ -230,9 +230,6 @@ export function PrintList({
                       >
                         {timestamp.format(record.createdAt)}
                       </time>
-                      <span className="inline-flex shrink-0 text-[var(--muted)]">
-                        <LanguageIcon language={language} />
-                      </span>
                       <span className="vp-code-name truncate text-[14px] font-medium text-[var(--text)]">
                         {record.filename}
                       </span>
@@ -266,6 +263,7 @@ export function ContestSettings({
   contestId,
   contestHref,
   contestName,
+  teamId,
   teamName,
   owner,
   navigate,
@@ -275,6 +273,7 @@ export function ContestSettings({
   contestId: string;
   contestHref: string;
   contestName: string;
+  teamId: string;
   teamName: string;
   owner: boolean;
   navigate: MouseEventHandler<HTMLAnchorElement>;
@@ -292,7 +291,7 @@ export function ContestSettings({
     setNameDraft(contestName);
   }, [contestId, contestName]);
 
-  const cliCommand = `vprint use --team ${JSON.stringify(teamName)} --contest ${JSON.stringify(contestName)}`;
+  const cliCommand = `vprint use --team ${teamId} --contest ${contestId}`;
 
   async function saveContestName(event: FormEvent) {
     event.preventDefault();
@@ -429,7 +428,7 @@ export function ContestSettings({
             className="shrink-0 text-[var(--muted)]"
             aria-hidden="true"
           />
-          <code className="flex-1 truncate text-[13px] text-[var(--text)]">
+          <code className="min-w-0 flex-1 break-words text-[13px] text-[var(--text)]">
             {cliCommand}
           </code>
           <Button
@@ -595,14 +594,9 @@ export function PrintPage({
         {detail && (
           <article aria-label="打印件">
             <header className="mb-4">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span className="inline-flex text-[var(--muted)]">
-                  <LanguageIcon language={language} />
-                </span>
-                <h1 className="vp-code-name text-[20px] sm:text-[22px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)] break-all">
-                  {detail.filename}
-                </h1>
-              </div>
+              <h1 className="vp-code-name text-[20px] sm:text-[22px] font-semibold tracking-[-0.02em] leading-[1.25] text-[var(--text)] break-all">
+                {detail.filename}
+              </h1>
               <p className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-[var(--muted)] vp-num">
                 <span>{contestName}</span>
                 <span aria-hidden="true">·</span>

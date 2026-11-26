@@ -349,6 +349,7 @@ export function Workspace({
             contestId={contestId}
             contestHref={contestHref}
             contestName={data.contest.name}
+            teamId={data.contest.teamId}
             teamName={team?.name ?? ""}
             owner={team?.role === "owner"}
             navigate={follow}

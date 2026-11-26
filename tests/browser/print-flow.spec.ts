@@ -25,7 +25,12 @@ test("a member authorizes a real CLI and reads its print on phones and desktops"
   await page.getByLabel("比赛名称").fill(name);
   await page.getByRole("button", { name: "创建比赛", exact: true }).click();
   const contest = page.getByRole("list", { name: "比赛" }).getByRole("link", { name: new RegExp(name) });
-  await expect(contest).toBeVisible();
+  await contest.click();
+  await page.getByRole("link", { name: "比赛设置" }).click();
+  const [, , teamId, , contestId] = new URL(page.url()).pathname.split("/");
+  const command = page.locator("code").filter({ hasText: "vprint use" });
+  await expect(command).toHaveText(`vprint use --team ${teamId} --contest ${contestId}`);
+  const useArgs = (await command.innerText()).split(" ").slice(1);
 
   const workspace = await cliWorkspace();
   await writeSources(workspace.directory);
@@ -42,7 +47,7 @@ test("a member authorizes a real CLI and reads its print on phones and desktops"
     expect(await login.done).toBe(0);
     expect(login.output()).toContain("已登录 ");
 
-    const use = runCli(["use", "--team", name, "--contest", name], workspace.directory, baseURL!, workspace.credentials);
+    const use = runCli(useArgs, workspace.directory, baseURL!, workspace.credentials);
     activeCli.push(use);
     expect(await use.done).toBe(0);
     expect(use.output()).toContain("已绑定 " + name + " / " + name);
