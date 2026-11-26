@@ -1,11 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 
-async function expectCopy(page: Page, label: string, expected: string) {
+async function expectCopy(page: Page, label: string, expected: string, successText = "复制成功") {
   const button = page.getByRole("button", { name: label, exact: true });
-  const success = button.getByText("复制成功", { exact: true });
+  const success = button.locator(".vp-copy-success");
   const width = await button.evaluate((element) => getComputedStyle(element).width);
   await button.click();
   await expect(success).toHaveCSS("opacity", "1");
+  await expect(success).toHaveText(successText);
+  await expect(success.locator("svg")).toBeVisible();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(expected);
   expect(await button.evaluate((element) => getComputedStyle(element).width)).toBe(width);
   await expect(success).toHaveCSS("opacity", "0");
@@ -140,7 +142,8 @@ test("contest settings allow renaming and owner deletion confirmation", async ({
   await expect(page.getByRole("heading", { name: "打印列表" })).toBeVisible();
 
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-  await expectCopy(page, "复制打印命令", "vprint A.cpp");
+  await expect(page.getByRole("button", { name: "复制打印命令" })).toHaveText("");
+  await expectCopy(page, "复制打印命令", "vprint A.cpp", "");
   await page.getByRole("link", { name: "比赛设置" }).click();
   await expect(page.getByRole("heading", { name: "比赛设置" })).toBeVisible();
   const [, , teamId, , contestId] = new URL(page.url()).pathname.split("/");

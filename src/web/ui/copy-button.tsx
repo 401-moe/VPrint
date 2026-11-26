@@ -39,7 +39,7 @@ export function CopyButton({ value, label, iconOnly = false }: CopyButtonProps) 
       <Button
         variant={iconOnly ? "ghost" : "secondary"}
         compact
-        className="shrink-0"
+        className={iconOnly ? "w-8 shrink-0 px-0 max-md:w-11 max-md:px-0" : "shrink-0"}
         aria-label={label}
         title={iconOnly ? label : undefined}
         disabled={!value}
@@ -52,7 +52,7 @@ export function CopyButton({ value, label, iconOnly = false }: CopyButtonProps) 
           </span>
           <span className="vp-copy-success">
             <Check size={14} />
-            复制成功
+            {!iconOnly && "复制成功"}
           </span>
         </span>
       </Button>
