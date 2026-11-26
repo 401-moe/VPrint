@@ -6,10 +6,9 @@ const teamId = "11111111-1111-4111-8111-111111111111";
 const contestPath = `/team/${teamId}/contest/${contestId}`;
 const createdAt = Date.UTC(2026, 10, 21, 5, 0);
 const workspace = {
-  teams: [{ id: teamId, name: "火苗", role: "owner", invitationUrl: "", memberCount: 1, contestCount: 1 }],
-  contests: [],
-  selectedTeamId: teamId,
-  contest: { id: contestId, name: "训练", createdAt, teamId },
+  scope: "contest",
+  team: { id: teamId, name: "火苗", role: "owner" },
+  contest: { id: contestId, name: "训练", createdAt },
 };
 const lines = Array.from({ length: 120 }, (_, i) =>
   i === 36 ? '  return "ok"; // done ' + "x".repeat(280) : "// 文件 " + (i + 1),

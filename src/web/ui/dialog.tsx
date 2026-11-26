@@ -48,7 +48,7 @@ export function DialogContent({
       <BaseDialog.Popup
         id={id}
         className={cn(
-          "vp-dialog-popup fixed left-1/2 top-1/2 w-[min(440px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius-card)] bg-[var(--surface)] border border-[var(--border)] p-6 text-[var(--text)] outline-none",
+          "vp-dialog-popup fixed left-1/2 top-1/2 w-[min(440px,calc(100%-2rem))] max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius-card)] bg-[var(--surface)] border border-[var(--border)] p-6 text-[var(--text)] outline-none",
           className,
         )}
         style={{

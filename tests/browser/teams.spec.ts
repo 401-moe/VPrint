@@ -98,3 +98,39 @@ test("a multi-team user returns from a deep link to its team and an outsider see
   await expect(page.getByRole("heading", { name: "无法访问比赛" })).toBeVisible();
   await expect(page.getByRole("link", { name: "返回所有队伍" })).toBeVisible();
 });
+
+test("creating a team succeeds when remembering its selection fails", async ({ page }) => {
+  await page.goto("/login");
+  await register(page, "建队者");
+  let creations = 0;
+  page.on("request", request => {
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/teams") creations++;
+  });
+  await page.route("**/api/teams/*/selection", route => route.fulfill({ status: 503 }));
+  const preference = page.waitForResponse("**/api/teams/*/selection");
+  await createTeam(page, "只创建一次");
+  expect((await preference).status()).toBe(503);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("link", { name: "所有队伍", exact: true }).click();
+  await expect(page.getByRole("list", { name: "队伍" }).getByRole("listitem")).toHaveCount(1);
+  expect(creations).toBe(1);
+});
+
+test("a long account name leaves the narrow header and its links usable", async ({ page }) => {
+  const name = "竞赛队员".repeat(8);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/login");
+  await register(page, name);
+  await createTeam(page, "小屏幕上的队伍");
+  const header = page.getByRole("banner");
+  const account = header.getByRole("link", { name, exact: true });
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    const accountBox = await account.boundingBox();
+    const navBox = await header.getByRole("navigation").boundingBox();
+    expect(navBox!.x + navBox!.width).toBeLessThanOrEqual(accountBox!.x);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  }
+  await account.click();
+  await expect(page.getByRole("heading", { name: "账号设置" })).toBeVisible();
+});

@@ -247,3 +247,39 @@ for (const firstPassword of [false, true]) {
     await expect(button(page, "修改密码")).toBeVisible();
   });
 }
+
+test("the password dialog stays centered during transitions and scrolls in a short viewport", async ({ page }) => {
+  await signUp(page, address());
+  await account(page);
+  await page.setViewportSize({ width: 740, height: 320 });
+  await button(page, "修改密码").click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toHaveCSS("opacity", "1");
+
+  // Measure the CSS endpoints without relying on when the browser paints an animation frame.
+  const { centers, top, bottom, scrollable } = await dialog.evaluate(element => {
+    const probe = element.cloneNode(false) as HTMLElement;
+    probe.removeAttribute("id");
+    probe.style.height = element.getBoundingClientRect().height + "px";
+    probe.style.transition = "none";
+    element.after(probe);
+    const centers = ["", "data-starting-style", "data-ending-style"].map(state => {
+      if (state) probe.setAttribute(state, "");
+      const box = probe.getBoundingClientRect();
+      if (state) probe.removeAttribute(state);
+      return [box.x + box.width / 2, box.y + box.height / 2];
+    });
+    probe.remove();
+    const { top, bottom } = element.getBoundingClientRect();
+    return { centers, top, bottom, scrollable: element.scrollHeight > element.clientHeight };
+  });
+  for (const [x, y] of centers) {
+    expect(x).toBeCloseTo(centers[0][0], 1);
+    expect(y).toBeCloseTo(centers[0][1], 1);
+  }
+  expect(top).toBeGreaterThanOrEqual(0);
+  expect(bottom).toBeLessThanOrEqual(320);
+  expect(scrollable).toBe(true);
+  await dialog.getByRole("button", { name: "取消" }).click();
+  await expect(dialog).toHaveCount(0);
+});

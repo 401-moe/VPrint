@@ -1,15 +1,6 @@
 import { contestPath } from "./workspace-routes";
 import { Printer } from "lucide-react";
 
-export interface Team {
-  id: string;
-  name: string;
-  role: string;
-  invitationUrl: string;
-  memberCount?: number;
-  contestCount?: number;
-}
-
 export function BreadcrumbHeader({
   memberName,
   team,
@@ -67,7 +58,7 @@ export function BreadcrumbHeader({
                     : "text-[var(--muted)] hover:text-[var(--text)]"
                 }`}
               >
-                {team.name}
+                <span className="truncate">{team.name}</span>
               </a>
             </>
           )}
@@ -81,7 +72,7 @@ export function BreadcrumbHeader({
                 href={contestPath(team.id, contest.id)}
                 className="hidden sm:inline-flex max-w-[260px] truncate rounded-[var(--radius-control)] px-1.5 py-1 font-medium text-[var(--text)] vp-hover-surface"
               >
-                {contest.name}
+                <span className="truncate">{contest.name}</span>
               </a>
             </>
           )}
@@ -90,13 +81,14 @@ export function BreadcrumbHeader({
         {memberName && (
           <a
             href="/account"
-            className={`shrink-0 rounded-[var(--radius-control)] px-2 py-1 text-[13px] vp-hover-surface pointer-coarse:min-h-11 inline-flex items-center ${
+            title={memberName}
+            className={`min-w-0 max-w-[min(30%,16rem)] shrink-0 rounded-[var(--radius-control)] px-2 py-1 text-[13px] vp-hover-surface pointer-coarse:min-h-11 inline-flex items-center ${
               accountActive
                 ? "font-medium text-[var(--text)]"
                 : "text-[var(--muted)] hover:text-[var(--text)]"
             }`}
           >
-            {memberName}
+            <span className="truncate">{memberName}</span>
           </a>
         )}
       </div>

@@ -71,9 +71,9 @@ async function previewInvitation(cookie: string, token: string) {
   return worker.fetch(request(`/api/team-invitations/${token}`, { headers: { cookie } }), env);
 }
 
-async function workspace(cookie: string, contestId?: string) {
+async function workspace(cookie: string, params: Record<string, string> = {}) {
   return worker.fetch(
-    request(`/api/workspace${contestId ? `?contestId=${contestId}` : ""}`, {
+    request(`/api/workspace?${new URLSearchParams(params)}`, {
       headers: { cookie },
     }),
     env,
@@ -296,19 +296,15 @@ test("same-named contests have independent ids and appear newest first", async (
     await insertPrintout({ id, contestId: firstContest.id, userId: ownerId, requestId: crypto.randomUUID(), filename: "A.cpp" });
   }
 
-  const listed = await workspace(memberCookie);
-  const listBody = (await listed.json()) as {
-    selectedTeamId: string;
-    contests: { id: string; name: string; createdAt: number }[];
-  };
-  expect(listBody.selectedTeamId).toBe(team.id);
-  expect(listBody.contests.map((contest) => contest.id)).toEqual([
-    secondContest.id,
-    firstContest.id,
-  ]);
-  expect(listBody.contests[0]).toMatchObject({ printCount: 0, latestPrintId: null, latestFilename: null, latestPrintAt: null });
-  expect(listBody.contests[1]).toMatchObject({ printCount: 2, latestPrintId: printIds[1], latestFilename: "A.cpp", latestPrintAt: 1000 });
-  expect(listBody.contests[1]).not.toHaveProperty("content");
+  const listed = await workspace(memberCookie, { teamId: team.id });
+  expect(await listed.json()).toEqual({
+    scope: "team",
+    team: { id: team.id, name: "火苗", role: "member" },
+    contests: [
+      { ...secondContest, printCount: 0 },
+      { ...firstContest, printCount: 2 },
+    ],
+  });
 });
 
 test("workspace restores the last accessible team and contest links take priority", async () => {
@@ -350,13 +346,14 @@ test("workspace restores the last accessible team and contest links take priorit
     secondTeam.id,
   );
 
-  const deepLinked = await workspace(cookie, createdContest.id);
-  const deepLinkedBody = (await deepLinked.json()) as {
-    selectedTeamId: string;
-    contest: { id: string };
-  };
-  expect(deepLinkedBody.selectedTeamId).toBe(firstTeam.id);
-  expect(deepLinkedBody.contest.id).toBe(createdContest.id);
+  const deepLinked = await workspace(cookie, { teamId: firstTeam.id, contestId: createdContest.id });
+  expect(await deepLinked.json()).toEqual({
+    scope: "contest",
+    team: { id: firstTeam.id, name: "第一队", role: "owner" },
+    contest: createdContest,
+  });
+  const mismatched = await workspace(cookie, { teamId: secondTeam.id, contestId: createdContest.id });
+  expect(mismatched.status).toBe(403);
 
   await env.DB.prepare("DELETE FROM team_member WHERE teamId = ? AND userId = ?").bind(
     secondTeam.id,
@@ -406,7 +403,7 @@ test("an outside account cannot open a contest or create one for the team", asyn
   );
   expect(outsiderCreation.status).toBe(403);
 
-  const outsiderDeepLink = await workspace(outsideCookie, contest.id);
+  const outsiderDeepLink = await workspace(outsideCookie, { teamId: team.id, contestId: contest.id });
   expect(outsiderDeepLink.status).toBe(403);
 });
 
@@ -492,11 +489,12 @@ test("the owner sees teammates, while members receive a redacted invitation", as
     { id: memberId, name: "乙", role: "member" },
   ]);
 
-  const memberWorkspace = await workspace(memberCookie);
-  const workspaceBody = (await memberWorkspace.json()) as {
-    teams: { id: string; invitationUrl: string }[];
-  };
-  expect(workspaceBody.teams.find((item) => item.id === team.id)?.invitationUrl).toBe("");
+  const memberSettings = await workspace(memberCookie, { teamId: team.id, view: "settings" });
+  expect(await memberSettings.json()).toEqual({
+    scope: "team-settings",
+    team: { id: team.id, name: expect.any(String), role: "member" },
+    invitationUrl: "",
+  });
 });
 
 test("the owner removes a member and resets the invitation together", async () => {
@@ -548,7 +546,7 @@ test("the owner removes a member and resets the invitation together", async () =
 
   const oldInvitation = await join(memberCookie, team.invitationToken);
   expect(oldInvitation.status).toBe(404);
-  const removedWorkspace = await workspace(memberCookie, team.id);
+  const removedWorkspace = await workspace(memberCookie, { teamId: team.id });
   expect(removedWorkspace.status).toBe(403);
 
   const reset = (await (await resetInvitation(ownerCookie, team.id)).json()) as {
@@ -829,9 +827,9 @@ test("only the current owner can delete a selected contest and its printouts", a
   );
   expect(deletion.status).toBe(200);
 
-  const deletedWorkspace = await workspace(ownerCookie, saturday.id);
+  const deletedWorkspace = await workspace(ownerCookie, { teamId: team.id, contestId: saturday.id });
   expect(deletedWorkspace.status).toBe(403);
-  const remainingWorkspace = await workspace(ownerCookie, sunday.id);
+  const remainingWorkspace = await workspace(ownerCookie, { teamId: team.id });
   expect(remainingWorkspace.status).toBe(200);
   expect(((await remainingWorkspace.json()) as { contests: { id: string }[] }).contests.map(
     (contest) => contest.id,
@@ -983,18 +981,19 @@ test("team renaming is owner-only, contest renaming allows teammates, and worksp
     env,
   );
   expect(scopedWs.status).toBe(200);
-  const scopedBody = (await scopedWs.json()) as {
-    selectedTeamId: string;
-    teams: { id: string; name: string; memberCount: number; contestCount: number }[];
-    contests: { id: string; name: string }[];
-  };
-  expect(scopedBody.selectedTeamId).toBe(firstTeam.id);
-  expect(scopedBody.teams.find((t) => t.id === firstTeam.id)).toMatchObject({
-    name: "一队（已改名）",
-    memberCount: 2,
-    contestCount: 1,
+  expect(await scopedWs.json()).toEqual({
+    scope: "team",
+    team: { id: firstTeam.id, name: "一队（已改名）", role: "owner" },
+    contests: [{ id: contest.id, name: "周六热身 · 定稿", createdAt: expect.any(Number), printCount: 0 }],
   });
-  expect(scopedBody.contests.map((c) => c.name)).toEqual(["周六热身 · 定稿"]);
+  const home = await workspace(ownerCookie);
+  expect(await home.json()).toEqual({
+    scope: "user",
+    selectedTeamId: expect.any(String),
+    teams: expect.arrayContaining([{
+      id: firstTeam.id, name: "一队（已改名）", role: "owner", memberCount: 2, contestCount: 1,
+    }]),
+  });
 
   const outsiderTeamScope = await worker.fetch(
     request(`/api/workspace?teamId=${secondTeam.id}`, { headers: { cookie: memberCookie } }),

@@ -167,39 +167,47 @@ export function TeamManagement({
     setPending(true);
     setError("");
     try {
-      if (confirmation.kind === "reset-invite") {
-        const body = await api<{ invitationUrl: string }>(
-          `/api/teams/${teamId}/invitation`,
-          { method: "POST", body: "{}" },
-        );
-        onInvitationChange(body.invitationUrl);
-        setInvitationReset(true);
-        toast.success("邀请链接已重置，旧链接已失效");
-      } else if (confirmation.kind === "remove") {
-        const body = await api<{ invitationUrl: string }>(
-          `/api/teams/${teamId}/members/${confirmation.member.id}`,
-          { method: "DELETE" },
-        );
-        onInvitationChange(body.invitationUrl);
-        setTeammates((current) =>
-          current.filter((m) => m.id !== confirmation.member.id),
-        );
-        toast(`已移除队员 ${confirmation.member.name}`);
-      } else if (confirmation.kind === "transfer") {
-        await api(`/api/teams/${teamId}/ownership`, {
-          method: "PUT",
-          body: JSON.stringify({ userId: confirmation.member.id }),
-        });
-        toast.success(`已将队长转让给 ${confirmation.member.name}`);
-        onTeamChanged();
-      } else if (confirmation.kind === "leave") {
-        await api(`/api/teams/${teamId}/membership`, { method: "DELETE" });
-        toast("已退出队伍");
-        onTeamDissolved();
-      } else {
-        await api(`/api/teams/${teamId}/deletion`, { method: "DELETE" });
-        toast(`已解散队伍「${confirmation.summary.name}」`);
-        onTeamDissolved();
+      switch (confirmation.kind) {
+        case "reset-invite": {
+          const body = await api<{ invitationUrl: string }>(
+            `/api/teams/${teamId}/invitation`,
+            { method: "POST", body: "{}" },
+          );
+          onInvitationChange(body.invitationUrl);
+          setInvitationReset(true);
+          toast.success("邀请链接已重置，旧链接已失效");
+          break;
+        }
+        case "remove": {
+          const body = await api<{ invitationUrl: string }>(
+            `/api/teams/${teamId}/members/${confirmation.member.id}`,
+            { method: "DELETE" },
+          );
+          onInvitationChange(body.invitationUrl);
+          setTeammates((current) => current.filter((m) => m.id !== confirmation.member.id));
+          toast(`已移除队员 ${confirmation.member.name}`);
+          break;
+        }
+        case "transfer":
+          await api(`/api/teams/${teamId}/ownership`, {
+            method: "PUT",
+            body: JSON.stringify({ userId: confirmation.member.id }),
+          });
+          toast.success(`已将队长转让给 ${confirmation.member.name}`);
+          onTeamChanged();
+          break;
+        case "leave":
+          await api(`/api/teams/${teamId}/membership`, { method: "DELETE" });
+          toast("已退出队伍");
+          onTeamDissolved();
+          break;
+        case "dissolve":
+          await api(`/api/teams/${teamId}/deletion`, { method: "DELETE" });
+          toast(`已解散队伍「${confirmation.summary.name}」`);
+          onTeamDissolved();
+          break;
+        default:
+          throw new Error(`未知的队伍操作：${confirmation satisfies never}`);
       }
       setConfirmation(null);
     } catch (cause) {

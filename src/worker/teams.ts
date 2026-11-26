@@ -1,29 +1,6 @@
+import type { Contest, ContestSummary, TeamSummary, WorkspaceData, WorkspaceTeam } from "../shared/workspace";
 import { Hono } from "hono";
 import { getCurrentUser, type AuthEnvironment } from "./auth";
-
-interface TeamRow {
-  id: string;
-  name: string;
-  role: string;
-  createdAt: number;
-  invitationToken?: string;
-  memberCount?: number;
-  contestCount?: number;
-}
-
-interface TeamResponseRow extends TeamRow {
-  invitationUrl: string;
-}
-
-interface ContestRow {
-  id: string;
-  name: string;
-  createdAt: number;
-}
-
-interface ContestWithTeamRow extends ContestRow {
-  teamId: string;
-}
 
 type TeamContext = {
   Bindings: AuthEnvironment;
@@ -34,16 +11,6 @@ export const teamsRoutes = new Hono<TeamContext>();
 
 function invitationUrl(env: AuthEnvironment, token: string) {
   return `${env.BETTER_AUTH_URL.replace(/\/$/, "")}/invite/${token}`;
-}
-
-function teamResponse(row: TeamResponseRow) {
-  return {
-    id: row.id,
-    name: row.name,
-    role: row.role,
-    createdAt: row.createdAt,
-    invitationUrl: row.invitationUrl,
-  };
 }
 
 function randomToken() {
@@ -103,14 +70,8 @@ teamsRoutes.post("/teams", async (context) => {
 
   return context.json(
     {
-      ...teamResponse({
-        id,
-        name,
-        role: "owner",
-        createdAt,
-        invitationToken: token,
-        invitationUrl: invitationUrl(context.env, token),
-      }),
+      id, name, role: "owner", createdAt,
+      invitationUrl: invitationUrl(context.env, token),
       invitationToken: token,
     },
     201,
@@ -212,120 +173,73 @@ teamsRoutes.put("/teams/:teamId/ownership", async (context) => {
 teamsRoutes.get("/workspace", async (context) => {
   const user = await requireUser(context);
   if (!user) return context.json({ error: "authentication required" }, 401);
-  const requestedContestId = context.req.query("contestId");
-  const requestedTeamId = context.req.query("teamId");
-  if (requestedContestId && !teamId(requestedContestId)) {
-    return context.json({ error: "contest not found" }, 403);
-  }
-  if (!requestedContestId && requestedTeamId && !teamId(requestedTeamId)) {
-    return context.json({ error: "team not found" }, 403);
-  }
+  const contestId = context.req.query("contestId");
+  const teamId = context.req.query("teamId");
+  const db = context.env.DB;
 
-  if (requestedContestId) {
-    const membership = await context.env.DB.prepare(
-      `
-        SELECT contest.id
-        FROM contest
-        JOIN team_member ON team_member.teamId = contest.teamId
-        WHERE contest.id = ? AND team_member.userId = ?
-      `,
-    )
-      .bind(requestedContestId, user.id)
-      .first<{ id: string }>();
-    if (!membership) return context.json({ error: "contest not found" }, 403);
-  } else if (requestedTeamId) {
-    const membership = await context.env.DB.prepare(
-      "SELECT teamId FROM team_member WHERE teamId = ? AND userId = ?",
-    )
-      .bind(requestedTeamId, user.id)
-      .first<{ teamId: string }>();
-    if (!membership) return context.json({ error: "team not found" }, 403);
+  if (contestId !== undefined) {
+    const row = await db.prepare(`
+      SELECT c.id, c.name, c.createdAt, t.id AS teamId, t.name AS teamName, m.role
+      FROM contest c
+      JOIN team t ON t.id = c.teamId
+      JOIN team_member m ON m.teamId = t.id
+      WHERE c.id = ? AND t.id = ? AND m.userId = ?
+    `).bind(contestId, teamId ?? "", user.id)
+      .first<Contest & { teamId: string; teamName: string; role: WorkspaceTeam["role"] }>();
+    if (!row) return context.json({ error: "contest not found" }, 403);
+    return context.json({
+      scope: "contest",
+      team: { id: row.teamId, name: row.teamName, role: row.role },
+      contest: { id: row.id, name: row.name, createdAt: row.createdAt },
+    } satisfies WorkspaceData);
   }
 
-  const teams = await context.env.DB.prepare(
-    `
-      SELECT team.id, team.name, team_member.role, team.createdAt, team.invitationToken,
-        (SELECT COUNT(*) FROM team_member m2 WHERE m2.teamId = team.id) AS memberCount,
-        (SELECT COUNT(*) FROM contest c2 WHERE c2.teamId = team.id) AS contestCount
-      FROM team_member
-      JOIN team ON team.id = team_member.teamId
-      WHERE team_member.userId = ?
-      ORDER BY team.name, team.id
-    `,
-  )
-    .bind(user.id)
-    .all<TeamRow>();
+  if (teamId !== undefined) {
+    const membership = db.prepare(`
+      SELECT t.id, t.name, m.role, t.invitationToken
+      FROM team t JOIN team_member m ON m.teamId = t.id
+      WHERE t.id = ? AND m.userId = ?
+    `).bind(teamId, user.id);
+    if (context.req.query("view") === "settings") {
+      const row = await membership.first<WorkspaceTeam & { invitationToken: string }>();
+      if (!row) return context.json({ error: "team not found" }, 403);
+      const { invitationToken, ...team } = row;
+      return context.json({
+        scope: "team-settings", team,
+        invitationUrl: team.role === "owner" ? invitationUrl(context.env, invitationToken) : "",
+      } satisfies WorkspaceData);
+    }
 
-  if (teams.results.length === 0) {
-    return context.json({ teams: [], selectedTeamId: null, contests: [], contest: null });
+    const [row, contests] = await Promise.all([
+      membership.first<WorkspaceTeam>(),
+      db.prepare(`
+        SELECT c.id, c.name, c.createdAt,
+          (SELECT COUNT(*) FROM printout WHERE contestId = c.id) AS printCount
+        FROM contest c JOIN team_member m ON m.teamId = c.teamId
+        WHERE c.teamId = ? AND m.userId = ?
+        ORDER BY c.createdAt DESC, c.id DESC
+      `).bind(teamId, user.id).all<ContestSummary>(),
+    ]);
+    if (!row) return context.json({ error: "team not found" }, 403);
+    return context.json({
+      scope: "team",
+      team: { id: row.id, name: row.name, role: row.role },
+      contests: contests.results,
+    } satisfies WorkspaceData);
   }
 
-  let contest: ContestWithTeamRow | null = null;
-  let selectedTeam: TeamRow | undefined;
-
-  if (requestedContestId) {
-    contest = await context.env.DB.prepare(
-      `
-        SELECT contest.id, contest.name, contest.createdAt, contest.teamId
-        FROM contest
-        JOIN team_member ON team_member.teamId = contest.teamId
-        WHERE contest.id = ? AND team_member.userId = ?
-      `,
-    )
-      .bind(requestedContestId, user.id)
-      .first<ContestWithTeamRow>();
-    if (!contest) return context.json({ error: "contest not found" }, 403);
-
-    selectedTeam = teams.results.find((team) => team.id === contest?.teamId);
-  } else if (requestedTeamId) {
-    selectedTeam = teams.results.find((team) => team.id === requestedTeamId);
-    if (!selectedTeam) return context.json({ error: "team not found" }, 403);
-  }
-
-  if (!selectedTeam) {
-    const selection = await context.env.DB.prepare(
-      `
-        SELECT team.id, team.name, team_member.role, team.createdAt, team.invitationToken
-        FROM team_selection
-        JOIN team ON team.id = team_selection.teamId
-        JOIN team_member ON team_member.teamId = team.id AND team_member.userId = ?
-        WHERE team_selection.userId = ?
-      `,
-    )
-      .bind(user.id, user.id)
-    .first<TeamRow>();
-    selectedTeam = selection ?? teams.results[0];
-  }
-
-  const contests = await context.env.DB.prepare(
-    `
-      SELECT c.id, c.name, c.createdAt,
-        (SELECT COUNT(*) FROM printout WHERE contestId = c.id) AS printCount,
-        p.id AS latestPrintId, p.filename AS latestFilename, p.createdAt AS latestPrintAt
-      FROM contest c JOIN team_member m ON m.teamId = c.teamId
-      LEFT JOIN printout p ON p.id = (
-        SELECT id FROM printout WHERE contestId = c.id ORDER BY createdAt DESC, id DESC LIMIT 1
-      )
-      WHERE c.teamId = ? AND m.userId = ?
-      ORDER BY c.createdAt DESC, c.id DESC
-    `,
-  )
-    .bind(selectedTeam.id, user.id)
-    .all<ContestRow>();
-
+  const { results } = await db.prepare(`
+    SELECT t.id, t.name, m.role, s.teamId IS NOT NULL AS selected,
+      (SELECT COUNT(*) FROM team_member WHERE teamId = t.id) AS memberCount,
+      (SELECT COUNT(*) FROM contest WHERE teamId = t.id) AS contestCount
+    FROM team_member m JOIN team t ON t.id = m.teamId
+    LEFT JOIN team_selection s ON s.userId = m.userId AND s.teamId = t.id
+    WHERE m.userId = ?
+    ORDER BY t.name, t.id
+  `).bind(user.id).all<TeamSummary & { selected: number }>();
   return context.json({
-    teams: teams.results.map((team) => ({
-      id: team.id,
-      name: team.name,
-      role: team.role,
-      createdAt: team.createdAt,
-      memberCount: Number(team.memberCount ?? 0),
-      contestCount: Number(team.contestCount ?? 0),
-      invitationUrl:
-        team.role === "owner" ? invitationUrl(context.env, team.invitationToken ?? "") : "",
-    })),
-    selectedTeamId: selectedTeam.id,
-    contests: contests.results,
-    contest,
-  });
+    scope: "user",
+    teams: results.map(({ selected, ...team }) => team),
+    selectedTeamId: (results.find(team => team.selected) ?? results[0])?.id ?? null,
+  } satisfies WorkspaceData);
 });

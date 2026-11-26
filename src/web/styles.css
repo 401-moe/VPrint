@@ -172,7 +172,7 @@ body :is(input, select, textarea):focus-visible {
 
 .vp-dialog-popup:is([data-starting-style], [data-ending-style]) {
   opacity: 0;
-  transform: translate(-50%, -48%) scale(0.96);
+  transform: scale(0.96);
 }
 
 /* Source reader: independent non-copyable line gutter + smooth horizontal scroll */

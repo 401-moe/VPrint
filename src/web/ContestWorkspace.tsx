@@ -3,20 +3,10 @@ import { type FormEvent, useState } from "react";
 import { ArrowLeft, ChevronRight, FolderOpen, Plus, Settings, Users } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "./api";
-import type { Team } from "./Shell";
+import type { ContestSummary, TeamSummary, WorkspaceTeam } from "../shared/workspace";
 import { Button, buttonClassName } from "./ui/button";
 import { DialogContent, DialogRoot } from "./ui/dialog";
 import { Input } from "./ui/input";
-
-export interface ContestSummary {
-  id: string;
-  name: string;
-  createdAt: number;
-  printCount: number;
-  latestPrintId: string | null;
-  latestFilename: string | null;
-  latestPrintAt: number | null;
-}
 
 const timestamp = new Intl.DateTimeFormat("zh-CN", {
   timeZone: "Asia/Shanghai",
@@ -33,7 +23,7 @@ export function UserTeamsPage({
   onOpenCreateTeam,
 }: {
   memberName: string;
-  teams: Team[];
+  teams: TeamSummary[];
   onOpenCreateTeam: () => void;
 }) {
   return (
@@ -44,7 +34,7 @@ export function UserTeamsPage({
             我的队伍
           </h1>
           <p className="mt-1 text-[13px] text-[var(--muted)] vp-num">
-            {memberName} · 已加入 {teams.length} 支队伍
+            <span className="wrap-anywhere">{memberName}</span> · 已加入 {teams.length} 支队伍
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -95,16 +85,12 @@ export function UserTeamsPage({
                         {team.role === "owner" ? "队长" : "队员"}
                       </span>
                     </div>
-                    {team.memberCount !== undefined && (
-                      <p className="mt-1 text-[13px] text-[var(--faint)] vp-num">
-                        {team.memberCount} 名队员
-                      </p>
-                    )}
+                    <p className="mt-1 text-[13px] text-[var(--faint)] vp-num">
+                      {team.memberCount} 名队员
+                    </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3 text-[13px] text-[var(--muted)] vp-num">
-                    {team.contestCount !== undefined && (
-                      <span>{team.contestCount} 场</span>
-                    )}
+                    <span>{team.contestCount} 场</span>
                     <ChevronRight
                       size={15}
                       className="text-[var(--faint)]"
@@ -126,7 +112,7 @@ export function TeamContestsPage({
   contests,
   refresh,
 }: {
-  team: Team;
+  team: WorkspaceTeam;
   contests: ContestSummary[];
   refresh: () => void;
 }) {

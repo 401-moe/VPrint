@@ -22,7 +22,7 @@ export function InvitePage({
   onJoined,
 }: {
   token: string;
-  onJoined: (teamId: string) => Promise<void>;
+  onJoined: (teamId: string) => void;
 }) {
   const [preview, setPreview] = useState<InvitationPreview | null>(null);
   const [invalid, setInvalid] = useState(false);
@@ -70,9 +70,9 @@ export function InvitePage({
             body: "{}",
           },
         );
-        await onJoined(team.id);
+        onJoined(team.id);
       } else {
-        await onJoined(preview.teamId);
+        onJoined(preview.teamId);
       }
     } catch (cause) {
       if (invalidInvitationError(cause)) setInvalid(true);

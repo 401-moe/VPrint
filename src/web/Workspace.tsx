@@ -3,12 +3,11 @@ import { api, ApiError } from "./api";
 import { AccountSettings } from "./AccountSettings";
 import { ContestSettings, PrintList, PrintPage } from "./ContestPrints";
 import {
-  type ContestSummary,
   TeamContestsPage,
   UserTeamsPage,
 } from "./ContestWorkspace";
 import { InvitePage } from "./InvitePage";
-import { BreadcrumbHeader, type Team } from "./Shell";
+import { BreadcrumbHeader } from "./Shell";
 import { TeamManagement } from "./TeamManagement";
 import { Button } from "./ui/button";
 import { DialogContent, DialogRoot } from "./ui/dialog";
@@ -16,12 +15,7 @@ import { Input } from "./ui/input";
 import { usePrintNotifications } from "./use-print-notifications";
 import { contestPath, contestRoute, teamRoute } from "./workspace-routes";
 
-interface WorkspaceData {
-  teams: Team[];
-  selectedTeamId: string | null;
-  contests: ContestSummary[];
-  contest: { id: string; name: string; createdAt: number; teamId: string } | null;
-}
+import type { WorkspaceData } from "../shared/workspace";
 
 type Member = { id: string; name: string; email: string };
 
@@ -52,27 +46,24 @@ export function Workspace({
   const account = path === "/account";
   const scoped = !account && !isInvite;
 
-  const queryKey = contestId
-    ? contestHref
-    : routeTeamId
-      ? `t:${routeTeamId}`
-      : "user";
+  const query = new URLSearchParams();
+  if (routeTeamId) query.set("teamId", routeTeamId);
+  if (contestId) query.set("contestId", contestId);
+  if (routeTeamSettings) query.set("view", "settings");
+  const queryKey = query.toString();
 
   const [snapshot, setSnapshot] = useState<{
     key: string;
     data: WorkspaceData;
   }>();
   const data = snapshot?.key === queryKey ? snapshot.data : undefined;
-  const team = data?.teams.find(
-    (t) => t.id === (routeTeamId || data.selectedTeamId),
-  );
-
+  const team = data && data.scope !== "user" ? data.team : undefined;
+  const contest = data?.scope === "contest" ? data.contest : undefined;
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision((v) => v + 1), []);
   const [failed, setFailed] = useState<{ key: string; denied: boolean } | null>(
     null,
   );
-  const [actionError, setActionError] = useState("");
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
   const [newTeamName, setNewTeamName] = useState("");
   const [creatingTeam, setCreatingTeam] = useState(false);
@@ -87,7 +78,7 @@ export function Workspace({
   } | null>(null);
 
   usePrintNotifications(
-    data?.contest?.id ?? "",
+    contest?.id ?? "",
     Boolean(printId),
     (notice) => {
       if (notice.type === "reload") setListVersion((v) => v + 1);
@@ -99,19 +90,11 @@ export function Workspace({
     if (!scoped) return;
     const controller = new AbortController();
     setFailed(null);
-    const search = contestId
-      ? `?contestId=${encodeURIComponent(contestId)}`
-      : routeTeamId
-        ? `?teamId=${encodeURIComponent(routeTeamId)}`
-        : "";
-    api<WorkspaceData>(`/api/workspace${search}`, {
+    api<WorkspaceData>(queryKey ? `/api/workspace?${queryKey}` : "/api/workspace", {
       signal: controller.signal,
     })
       .then((value) => {
         if (controller.signal.aborted) return;
-        if (contestId && value.contest?.teamId !== routeTeamId) {
-          throw new ApiError(403, "比赛不属于该队伍");
-        }
         setSnapshot({ key: queryKey, data: value });
       })
       .catch((cause) => {
@@ -123,27 +106,23 @@ export function Workspace({
         });
       });
     return () => controller.abort();
-  }, [contestId, routeTeamId, queryKey, scoped, revision]);
+  }, [queryKey, scoped, revision]);
 
   useEffect(() => {
     const restore = () => {
       setPath(location.pathname);
       setNoticeId("");
-      setActionError("");
     };
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
   }, []);
 
   useEffect(() => {
-    if (!routeTeamId || !data?.selectedTeamId || routeTeamId !== team?.id) return;
-    if (data.selectedTeamId !== routeTeamId) {
-      void api(`/api/teams/${routeTeamId}/selection`, {
-        method: "PUT",
-        body: "{}",
-      }).catch(() => undefined);
-    }
-  }, [routeTeamId, team?.id, data?.selectedTeamId]);
+    if (!team?.id) return;
+    // Remembering the team is a preference. Navigation succeeds independently.
+    void api(`/api/teams/${team.id}/selection`, { method: "PUT", body: "{}" })
+      .catch(() => undefined);
+  }, [team?.id]);
 
   useEffect(() => {
     const titlePrefix = account
@@ -154,7 +133,7 @@ export function Workspace({
           ? "队伍邀请"
           : contestSettings
             ? "比赛设置"
-            : data?.contest?.name ||
+            : contest?.name ||
               (routeTeamId ? team?.name : undefined) ||
               "我的队伍";
     document.title = `${titlePrefix} · VPrint`;
@@ -164,14 +143,13 @@ export function Workspace({
     isInvite,
     contestSettings,
     routeTeamId,
-    data?.contest?.name,
+    contest?.name,
     team?.name,
   ]);
 
   function navigate(to: string) {
     if (location.pathname !== to) history.pushState(null, "", to);
     setPath(to);
-    setActionError("");
     setNoticeId("");
     if (!printId || to !== contestHref) window.scrollTo(0, 0);
   }
@@ -211,15 +189,9 @@ export function Workspace({
     navigate(url.pathname);
   }
 
-  async function join(teamId: string) {
-    if (location.pathname !== path) {
-      refresh();
-      return;
-    }
-    await api(`/api/teams/${teamId}/selection`, { method: "PUT", body: "{}" });
-    setSnapshot(undefined);
-    refresh();
+  function join(teamId: string) {
     if (location.pathname === path) navigate(`/team/${teamId}`);
+    else refresh();
   }
 
   async function createTeam(event: FormEvent) {
@@ -229,18 +201,12 @@ export function Workspace({
     setCreatingTeam(true);
     setCreateTeamError("");
     try {
-      const created = await api<Team>("/api/teams", {
+      const created = await api<{ id: string }>("/api/teams", {
         method: "POST",
         body: JSON.stringify({ name: trimmed }),
       });
-      await api(`/api/teams/${created.id}/selection`, {
-        method: "PUT",
-        body: "{}",
-      });
       setCreateTeamOpen(false);
       setNewTeamName("");
-      setSnapshot(undefined);
-      refresh();
       navigate(`/team/${created.id}`);
     } catch {
       setCreateTeamError("创建队伍失败，请重试。");
@@ -250,13 +216,9 @@ export function Workspace({
   }
 
   function updateInvitation(url: string) {
-    if (!team) return;
     setSnapshot((current) => {
-      if (!current) return current;
-      const teams = current.data.teams.map((t) =>
-        t.id === team.id ? { ...t, invitationUrl: url } : t,
-      );
-      return { ...current, data: { ...current.data, teams } };
+      if (current?.key !== queryKey || current.data.scope !== "team-settings") return current;
+      return { ...current, data: { ...current.data, invitationUrl: url } };
     });
   }
 
@@ -315,13 +277,6 @@ export function Workspace({
     );
   }
 
-  const headerTeam =
-    team && (contestId || routeTeamId) ? { id: team.id, name: team.name } : null;
-  const headerContest =
-    data?.contest && contestId
-      ? { id: data.contest.id, name: data.contest.name }
-      : null;
-
   function renderContent() {
     if (account) {
       return (
@@ -340,18 +295,18 @@ export function Workspace({
 
     if (!data) return loading();
 
-    if (contestId) {
-      if (!data.contest) return loading();
-      const teamHref = team ? `/team/${team.id}` : "/workspace";
+    if (data.scope === "contest") {
+      const { team, contest } = data;
+      const teamHref = `/team/${team.id}`;
       if (contestSettings) {
         return (
           <ContestSettings
             contestId={contestId}
             contestHref={contestHref}
-            contestName={data.contest.name}
-            teamId={data.contest.teamId}
-            teamName={team?.name ?? ""}
-            owner={team?.role === "owner"}
+            contestName={contest.name}
+            teamId={team.id}
+            teamName={team.name}
+            owner={team.role === "owner"}
             navigate={follow}
             onUpdated={refresh}
             onDeleted={() => {
@@ -368,8 +323,8 @@ export function Workspace({
             key={printId}
             contestId={contestId}
             contestHref={contestHref}
-            contestName={data.contest.name}
-            createdAt={data.contest.createdAt}
+            contestName={contest.name}
+            createdAt={contest.createdAt}
             printId={printId}
             noticeId={noticeId}
             navigate={follow}
@@ -381,8 +336,8 @@ export function Workspace({
           key={contestId}
           contestId={contestId}
           contestHref={contestHref}
-          contestName={data.contest.name}
-          createdAt={data.contest.createdAt}
+          contestName={contest.name}
+          createdAt={contest.createdAt}
           teamHref={teamHref}
           version={listVersion}
           navigate={follow}
@@ -395,28 +350,30 @@ export function Workspace({
       );
     }
 
-    if (routeTeamId) {
-      if (!team) return loading();
-      if (routeTeamSettings) {
-        return (
-          <TeamManagement
-            key={team.id}
-            teamId={team.id}
-            teamName={team.name}
-            role={team.role}
-            memberId={member.id}
-            memberName={member.name}
-            invitationUrl={team.invitationUrl}
-            onInvitationChange={updateInvitation}
-            onTeamChanged={refresh}
-            onTeamDissolved={() => {
-              setSnapshot(undefined);
-              refresh();
-              navigate("/workspace");
-            }}
-          />
-        );
-      }
+    if (data.scope === "team-settings") {
+      const { team } = data;
+      return (
+        <TeamManagement
+          key={team.id}
+          teamId={team.id}
+          teamName={team.name}
+          role={team.role}
+          memberId={member.id}
+          memberName={member.name}
+          invitationUrl={data.invitationUrl}
+          onInvitationChange={updateInvitation}
+          onTeamChanged={refresh}
+          onTeamDissolved={() => {
+            setSnapshot(undefined);
+            refresh();
+            navigate("/workspace");
+          }}
+        />
+      );
+    }
+
+    if (data.scope === "team") {
+      const { team } = data;
       return (
         <TeamContestsPage
           key={team.id}
@@ -439,24 +396,22 @@ export function Workspace({
     );
   }
 
-  const message = error || actionError;
-
   return (
     <div onClick={follow}>
       <BreadcrumbHeader
         memberName={member.name}
-        team={headerTeam}
-        contest={headerContest}
+        team={team}
+        contest={contest}
         accountActive={account}
       />
 
-      {message && (
+      {error && (
         <div className="vp-frame pt-4">
           <p
             role="alert"
             className="rounded-[var(--radius-control)] border border-[var(--negative)]/35 bg-[var(--surface)] px-4 py-2.5 text-[13px] text-[var(--negative)]"
           >
-            {message}
+            {error}
           </p>
         </div>
       )}
