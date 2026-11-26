@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 const contestId = "7b27b4b5-b5d1-4d5e-b9f4-0f63c5341ae4";
 const printId = "53fec5ec-2519-40ce-aa7b-082b2ba40e41";
 const teamId = "11111111-1111-4111-8111-111111111111";
+const contestPath = `/team/${teamId}/contest/${contestId}`;
 const createdAt = Date.UTC(2026, 10, 21, 5, 0);
 const workspace = {
   teams: [{ id: teamId, name: "火苗", role: "owner", invitationUrl: "", memberCount: 1, contestCount: 1 }],
@@ -30,7 +31,7 @@ for (const width of [390, 1280]) {
       await page.route("**/api/contests/*/prints/*", (route) =>
         route.fulfill({ json: { filename: "A.cpp", createdAt: 1000, content } }),
       );
-      await page.goto(`/contest/${contestId}/print/${printId}`);
+      await page.goto(`${contestPath}/print/${printId}`);
       await expect(page.getByRole("heading", { name: "A.cpp", exact: true })).toBeVisible();
       await expect(page.getByText("120 行")).toBeVisible();
       const source = page.getByRole("region", { name: "源码" });
@@ -67,7 +68,7 @@ for (const width of [390, 1280]) {
       expect(found).toBe(true);
       await expect(
         page.getByRole("link", { name: "返回打印列表" }),
-      ).toHaveAttribute("href", "/contest/" + contestId);
+      ).toHaveAttribute("href", contestPath);
       await expect(page.getByRole("list", { name: "打印件" })).toHaveCount(0);
     },
   );
@@ -90,11 +91,11 @@ test("the print list shows languages, duplicate counts, and level navigation", a
   await page.route("**/api/contests/*/prints", (route) =>
     route.fulfill({ json: { printouts: records } }),
   );
-  await page.goto("/contest/" + contestId);
+  await page.goto(contestPath);
   const list = page.getByRole("region", { name: "打印件列表" });
   await expect(list.getByRole("link", { name: /A\.cpp/ }).first()).toHaveAttribute(
     "href",
-    `/contest/${contestId}/print/${printId}`,
+    `${contestPath}/print/${printId}`,
   );
   await expect(list.getByText("14:32:08")).toBeVisible();
   await expect(list.getByText("第 2 次打印")).toBeVisible();
@@ -106,14 +107,14 @@ test("the print list shows languages, duplicate counts, and level navigation", a
   );
   await expect(page.getByRole("link", { name: "比赛设置" })).toHaveAttribute(
     "href",
-    `/contest/${contestId}/settings`,
+    `${contestPath}/settings`,
   );
 });
 
 test("opening a print and returning keeps the contest document and its subscription alive", async ({
   page,
 }) => {
-  const list = "/contest/" + contestId;
+  const list = contestPath;
   const reader = list + "/print/" + printId;
   const records = Array.from({ length: 48 }, (_, i) => ({
     id: i === 20 ? printId : crypto.randomUUID(),
@@ -187,7 +188,15 @@ test("a contest recovers from an initial network failure without reloading the p
       socket.send(JSON.stringify({ subscribed: [contestId] })),
     );
   });
-  await page.goto("/contest/" + contestId);
+  await page.goto(contestPath);
   await expect(page.getByRole("link", { name: /A\.cpp/ })).toBeVisible();
   expect(sessionRequests).toBe(2);
+});
+
+test("retired top-level contest links return HTTP 404", async ({ request }) => {
+  const oldPath = `/contest/${contestId}`;
+  for (const suffix of ["", "/settings", `/print/${printId}`]) {
+    const response = await request.get(oldPath + suffix, { maxRedirects: 0 });
+    expect(response.status()).toBe(404);
+  }
 });

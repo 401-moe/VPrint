@@ -16,8 +16,10 @@
 2. **四层独立页面与明确导航入口**
    - **L1 用户层级（`/workspace`、`/teams`）**：`我的队伍` 列表 + 右上角 `账号设置`（`/account`）与 `+ 新建队伍`。
    - **L2 队伍层级（`/team/:teamId`）**：`比赛列表`，右上角并列 `队伍设置`（`/team/:teamId/settings`）与 `+ 新建比赛`。
-   - **L3 比赛层级（`/contest/:contestId`）**：`打印列表`，右上角 `比赛设置`（`/contest/:contestId/settings`）。
-   - **L4 打印件层级（`/contest/:contestId/print/:printId`）**：仅保留 `← 返回打印列表`、文件名、基础元数据与全宽只读高亮源码视图（遵守 `SPEC.md` S23，不额外添加复制/下载按钮）。
+   - **L3 比赛层级（`/team/:teamId/contest/:contestId`）**：`打印列表`，右上角 `比赛设置`（`/team/:teamId/contest/:contestId/settings`）。
+   - **L4 打印件层级（`/team/:teamId/contest/:contestId/print/:printId`）**：仅保留 `← 返回打印列表`、文件名、基础元数据与全宽只读高亮源码视图（遵守 `SPEC.md` S23，不额外添加复制/下载按钮）。
+
+比赛、比赛设置和打印件共用队伍路径前缀。工作区核对网址中的队伍与比赛的实际归属；不匹配时显示「无法访问比赛」。旧的 `/contest/*` 路径返回 HTTP 404。
 
 ## 否决的备选方案
 

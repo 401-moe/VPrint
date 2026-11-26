@@ -68,14 +68,22 @@ test("a multi-team user returns from a deep link to its team and an outsider see
   await register(page, "多队队员");
   await createTeam(page, "第一队");
   await createContest(page, "第一队训练");
+  const firstTeamPath = new URL(page.url()).pathname;
   const contestPath = await page
     .getByRole("link", { name: /第一队训练/ })
     .getAttribute("href");
-  expect(contestPath).toMatch(/^\/contest\//);
+  expect(contestPath).toMatch(new RegExp(`^${firstTeamPath}/contest/[a-f0-9-]+$`));
 
   await page.getByRole("link", { name: "所有队伍", exact: true }).click();
   await expect(page.getByRole("heading", { name: "我的队伍" })).toBeVisible();
   await createTeam(page, "第二队");
+  const secondTeamPath = new URL(page.url()).pathname;
+  const mismatchedPath = contestPath!.replace(firstTeamPath, secondTeamPath);
+  for (const suffix of ["", "/settings", `/print/${crypto.randomUUID()}`]) {
+    await page.goto(mismatchedPath + suffix);
+    await expect(page.getByRole("heading", { name: "无法访问比赛" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "第一队训练" })).toHaveCount(0);
+  }
 
   await page.goto(contestPath!);
   await expect(page.getByRole("heading", { name: "打印列表" })).toBeVisible();

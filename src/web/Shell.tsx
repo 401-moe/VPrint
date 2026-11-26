@@ -1,3 +1,4 @@
+import { contestPath } from "./workspace-routes";
 import { Printer } from "lucide-react";
 
 export interface Team {
@@ -71,13 +72,13 @@ export function BreadcrumbHeader({
             </>
           )}
 
-          {memberName && contest && (
+          {memberName && team && contest && (
             <>
               <span className="hidden sm:inline shrink-0 text-[var(--faint)]" aria-hidden="true">
                 /
               </span>
               <a
-                href={`/contest/${contest.id}`}
+                href={contestPath(team.id, contest.id)}
                 className="hidden sm:inline-flex max-w-[260px] truncate rounded-[var(--radius-control)] px-1.5 py-1 font-medium text-[var(--text)] vp-hover-surface"
               >
                 {contest.name}

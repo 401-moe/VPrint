@@ -14,6 +14,7 @@ import { Button } from "./ui/button";
 import { DialogContent, DialogRoot } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { usePrintNotifications } from "./use-print-notifications";
+import { contestPath, contestRoute, teamRoute } from "./workspace-routes";
 
 interface WorkspaceData {
   teams: Team[];
@@ -37,16 +38,14 @@ export function Workspace({
 }) {
   const [path, setPath] = useState(location.pathname);
 
-  const contestMatch =
-    /^\/contest\/([^/]+)(?:\/(settings)|\/print\/([^/]+))?$/.exec(path);
-  const contestId = contestMatch?.[1] ?? "";
-  const contestSettings = contestMatch?.[2] === "settings";
-  const printId = contestMatch?.[3] ?? "";
-
-  const teamMatch = /^\/team\/([^/]+)(?:\/(settings))?$/.exec(path);
-  const routeTeamId = teamMatch?.[1] ?? "";
-  const routeTeamSettings = teamMatch?.[2] === "settings";
-  const legacyTeamPath = path === "/team";
+  const contestMatch = contestRoute.exec(path)?.groups;
+  const teamMatch = teamRoute.exec(path)?.groups;
+  const routeTeamId = contestMatch?.teamId ?? teamMatch?.teamId ?? "";
+  const contestId = contestMatch?.contestId ?? "";
+  const printId = contestMatch?.printId ?? "";
+  const contestSettings = Boolean(contestMatch?.settings);
+  const routeTeamSettings = Boolean(teamMatch?.settings);
+  const contestHref = contestPath(routeTeamId, contestId);
 
   const invite = /^\/invite\/([^/]+)$/.exec(path);
   const isInvite = Boolean(invite);
@@ -54,7 +53,7 @@ export function Workspace({
   const scoped = !account && !isInvite;
 
   const queryKey = contestId
-    ? `c:${contestId}`
+    ? contestHref
     : routeTeamId
       ? `t:${routeTeamId}`
       : "user";
@@ -109,9 +108,11 @@ export function Workspace({
       signal: controller.signal,
     })
       .then((value) => {
-        if (!controller.signal.aborted) {
-          setSnapshot({ key: queryKey, data: value });
+        if (controller.signal.aborted) return;
+        if (contestId && value.contest?.teamId !== routeTeamId) {
+          throw new ApiError(403, "比赛不属于该队伍");
         }
+        setSnapshot({ key: queryKey, data: value });
       })
       .catch((cause) => {
         if (controller.signal.aborted) return;
@@ -135,14 +136,6 @@ export function Workspace({
   }, []);
 
   useEffect(() => {
-    if (legacyTeamPath && data) {
-      const target = team ? `/team/${team.id}/settings` : "/workspace";
-      history.replaceState(null, "", target);
-      setPath(target);
-    }
-  }, [legacyTeamPath, data, team]);
-
-  useEffect(() => {
     if (!routeTeamId || !data?.selectedTeamId || routeTeamId !== team?.id) return;
     if (data.selectedTeamId !== routeTeamId) {
       void api(`/api/teams/${routeTeamId}/selection`, {
@@ -155,7 +148,7 @@ export function Workspace({
   useEffect(() => {
     const titlePrefix = account
       ? "账号设置"
-      : routeTeamSettings || legacyTeamPath
+      : routeTeamSettings
         ? "队伍设置"
         : isInvite
           ? "队伍邀请"
@@ -168,7 +161,6 @@ export function Workspace({
   }, [
     account,
     routeTeamSettings,
-    legacyTeamPath,
     isInvite,
     contestSettings,
     routeTeamId,
@@ -181,7 +173,7 @@ export function Workspace({
     setPath(to);
     setActionError("");
     setNoticeId("");
-    if (!to.match(/^\/contest\/[\w-]+$/)) window.scrollTo(0, 0);
+    if (!printId || to !== contestHref) window.scrollTo(0, 0);
   }
 
   function follow(event: MouseEvent<HTMLElement>) {
@@ -201,22 +193,19 @@ export function Workspace({
     const url = new URL(anchor.href);
     if (url.origin !== location.origin || url.hash || url.search) return;
 
-    const internal =
-      /^\/contest\/[\w-]+(?:\/settings|\/print\/[\w-]+)?$/.test(url.pathname) ||
-      /^\/team\/[\w-]+(?:\/settings)?$/.test(url.pathname) ||
-      ["/workspace", "/teams", "/team", "/account"].includes(url.pathname);
+    const nextContest = contestRoute.exec(url.pathname)?.groups;
+    const internal = nextContest || teamRoute.test(url.pathname) ||
+      ["/workspace", "/teams", "/account"].includes(url.pathname);
     if (!internal) return;
 
     event.preventDefault();
-    const nextPrint = /^\/contest\/([\w-]+)\/print\/([\w-]+)$/.exec(
-      url.pathname,
-    );
-    if (nextPrint) {
-      returnState.current =
-        !printId && nextPrint[1] === contestId
-          ? { contestId, printId: nextPrint[2], scrollY: window.scrollY }
-          : null;
-    } else if (!printId || url.pathname !== `/contest/${contestId}`) {
+    if (
+      nextContest?.printId &&
+      path === contestHref &&
+      path === contestPath(nextContest.teamId, nextContest.contestId)
+    ) {
+      returnState.current = { contestId, printId: nextContest.printId, scrollY: window.scrollY };
+    } else if (!printId || url.pathname !== contestHref) {
       returnState.current = null;
     }
     navigate(url.pathname);
@@ -358,6 +347,7 @@ export function Workspace({
         return (
           <ContestSettings
             contestId={contestId}
+            contestHref={contestHref}
             contestName={data.contest.name}
             teamName={team?.name ?? ""}
             owner={team?.role === "owner"}
@@ -376,6 +366,7 @@ export function Workspace({
           <PrintPage
             key={printId}
             contestId={contestId}
+            contestHref={contestHref}
             contestName={data.contest.name}
             createdAt={data.contest.createdAt}
             printId={printId}
@@ -388,6 +379,7 @@ export function Workspace({
         <PrintList
           key={contestId}
           contestId={contestId}
+          contestHref={contestHref}
           contestName={data.contest.name}
           createdAt={data.contest.createdAt}
           teamHref={teamHref}
@@ -433,8 +425,6 @@ export function Workspace({
         />
       );
     }
-
-    if (legacyTeamPath) return loading();
 
     return (
       <UserTeamsPage

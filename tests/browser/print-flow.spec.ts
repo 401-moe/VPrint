@@ -8,11 +8,12 @@ test("a member authorizes a real CLI and reads its print on phones and desktops"
   page,
   baseURL,
 }) => {
+  const email = `print-flow-${crypto.randomUUID()}@vprint.example`;
   await page.goto("/");
   await page.getByRole("link", { name: "进入训练工作区" }).click();
   await page.getByRole("button", { name: "注册", exact: true }).click();
   await page.getByLabel("姓名").fill("主机队员");
-  await page.getByLabel("邮箱").fill(`print-flow-${crypto.randomUUID()}@vprint.example`);
+  await page.getByLabel("邮箱").fill(email);
   await page.getByLabel("设置密码").fill(password);
   await page.getByRole("button", { name: "创建并进入" }).click();
   await expect(page.getByRole("heading", { name: "我的队伍" })).toBeVisible();
@@ -72,6 +73,16 @@ test("a member authorizes a real CLI and reads its print on phones and desktops"
     await secondLink.click();
     await expect(page.getByRole("region", { name: "源码" })).toContainText(secondSource.content.trimEnd());
     await expect(page.getByRole("heading", { name: secondSource.filename })).toBeVisible();
+
+    const readerUrl = page.url();
+    await page.context().clearCookies();
+    await page.goto(readerUrl);
+    await expect(page.getByRole("heading", { name: "登录训练工作区" })).toBeVisible();
+    await page.getByLabel("邮箱", { exact: true }).fill(email);
+    await page.getByLabel("密码", { exact: true }).fill(password);
+    await page.getByRole("button", { name: "登录", exact: true }).click();
+    await expect(page).toHaveURL(readerUrl);
+    await expect(page.getByRole("region", { name: "源码" })).toContainText(secondSource.content.trimEnd());
   } finally {
     for (const cli of activeCli) cli.stop();
     await workspace.close().catch(() => undefined);

@@ -4,7 +4,9 @@
 /github/choice  /workspace 200
 /account        /workspace 200
 /teams          /workspace 200
-/team           /workspace 200
-/team/*         /workspace 200
+/team/:teamId                                      /workspace 200
+/team/:teamId/settings                             /workspace 200
+/team/:teamId/contest/:contestId                   /workspace 200
+/team/:teamId/contest/:contestId/settings          /workspace 200
+/team/:teamId/contest/:contestId/print/:printId    /workspace 200
 /invite/*       /workspace 200
-/contest/*      /workspace 200

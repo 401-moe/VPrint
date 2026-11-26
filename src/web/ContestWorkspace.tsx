@@ -1,3 +1,4 @@
+import { contestPath } from "./workspace-routes";
 import { type FormEvent, useState } from "react";
 import { ArrowLeft, ChevronRight, FolderOpen, Plus, Settings, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -228,7 +229,7 @@ export function TeamContestsPage({
             {contests.map((contest) => (
               <li key={contest.id}>
                 <a
-                  href={`/contest/${contest.id}`}
+                  href={contestPath(team.id, contest.id)}
                   className="flex w-full items-center justify-between gap-4 px-5 py-3.5 vp-hover-row min-h-[46px] max-md:min-h-[48px]"
                 >
                   <span className="min-w-0 font-medium text-[var(--text)]">

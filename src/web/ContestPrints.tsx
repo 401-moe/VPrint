@@ -69,6 +69,7 @@ function computeDuplicateTags(records: PrintRecord[]): Map<string, number> {
 
 export function PrintList({
   contestId,
+  contestHref,
   contestName,
   createdAt,
   teamHref,
@@ -77,6 +78,7 @@ export function PrintList({
   returnState,
 }: {
   contestId: string;
+  contestHref: string;
   contestName: string;
   createdAt: number;
   teamHref: string;
@@ -114,10 +116,10 @@ export function PrintList({
     ).find(
       (element) =>
         element.getAttribute("href") ===
-        `/contest/${contestId}/print/${returnState.printId}`,
+        `${contestHref}/print/${returnState.printId}`,
     );
     link?.focus({ preventScroll: true });
-  }, [contestId, records?.length, returnState]);
+  }, [contestHref, records?.length, returnState]);
 
   if (error) {
     return (
@@ -179,7 +181,7 @@ export function PrintList({
         </div>
 
         <a
-          href={`/contest/${contestId}/settings`}
+          href={`${contestHref}/settings`}
           onClick={navigate}
           className={buttonClassName({ variant: "secondary" })}
         >
@@ -219,7 +221,7 @@ export function PrintList({
                   <a
                     onClick={navigate}
                     className="ft-link flex w-full items-center justify-between gap-4 px-5 py-3 vp-hover-row min-h-[46px] max-md:min-h-[48px]"
-                    href={`/contest/${contestId}/print/${record.id}`}
+                    href={`${contestHref}/print/${record.id}`}
                   >
                     <span className="flex min-w-0 items-center gap-3">
                       <time
@@ -262,6 +264,7 @@ export function PrintList({
 
 export function ContestSettings({
   contestId,
+  contestHref,
   contestName,
   teamName,
   owner,
@@ -270,6 +273,7 @@ export function ContestSettings({
   onDeleted,
 }: {
   contestId: string;
+  contestHref: string;
   contestName: string;
   teamName: string;
   owner: boolean;
@@ -354,7 +358,7 @@ export function ContestSettings({
     <main className="mx-auto max-w-[760px] px-4 py-8 sm:px-6 space-y-6">
       <div>
         <a
-          href={`/contest/${contestId}`}
+          href={contestHref}
           onClick={navigate}
           className={buttonClassName({
             variant: "ghost",
@@ -520,6 +524,7 @@ export function ContestSettings({
 
 export function PrintPage({
   contestId,
+  contestHref,
   contestName,
   createdAt,
   printId,
@@ -527,6 +532,7 @@ export function PrintPage({
   navigate,
 }: {
   contestId: string;
+  contestHref: string;
   contestName: string;
   createdAt: number;
   printId: string;
@@ -571,7 +577,7 @@ export function PrintPage({
             className: "-ml-2 mb-1",
           })}
           onClick={navigate}
-          href={`/contest/${contestId}`}
+          href={contestHref}
         >
           <ArrowLeft size={14} aria-hidden="true" />
           <span>返回打印列表</span>
