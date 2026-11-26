@@ -1,4 +1,5 @@
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { RenameForm } from "./RenameForm";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, MoreHorizontal, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "./api";
@@ -81,6 +82,7 @@ export function TeamManagement({
   memberId,
   memberName,
   onInvitationChange,
+  onRenamed,
   onTeamChanged,
   onTeamDissolved,
 }: {
@@ -91,22 +93,17 @@ export function TeamManagement({
   memberId: string;
   memberName: string;
   onInvitationChange: (invitationUrl: string) => void;
+  onRenamed: (name: string) => void;
   onTeamChanged: () => void;
   onTeamDissolved: () => void;
 }) {
   const owner = role === "owner";
-  const [nameDraft, setNameDraft] = useState(teamName);
-  const [savingName, setSavingName] = useState(false);
 
   const [teammates, setTeammates] = useState<Teammate[]>([]);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [invitationReset, setInvitationReset] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-
-  useEffect(() => {
-    setNameDraft(teamName);
-  }, [teamId, teamName]);
 
   useEffect(() => {
     if (!owner) return;
@@ -125,26 +122,6 @@ export function TeamManagement({
       active = false;
     };
   }, [owner, teamId]);
-
-  async function saveTeamName(event: FormEvent) {
-    event.preventDefault();
-    const trimmed = nameDraft.trim();
-    if (!owner || !trimmed || trimmed === teamName || savingName) return;
-    setSavingName(true);
-    setError("");
-    try {
-      await api(`/api/teams/${teamId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ name: trimmed }),
-      });
-      toast.success(`已将队伍更名为「${trimmed}」`);
-      onTeamChanged();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "保存队伍名称失败。");
-    } finally {
-      setSavingName(false);
-    }
-  }
 
   async function openDissolvePreview() {
     if (pending) return;
@@ -240,33 +217,7 @@ export function TeamManagement({
       <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5">
         <h2 className="text-[14px] font-semibold text-[var(--text)]">队伍名称</h2>
         {owner ? (
-          <form
-            onSubmit={saveTeamName}
-            className="mt-3 flex items-center gap-2.5"
-          >
-            <label htmlFor="team-name-field" className="sr-only">
-              队伍名称
-            </label>
-            <Input
-              id="team-name-field"
-              name="team_title"
-              maxLength={100}
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              className="min-w-0 flex-1"
-            />
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={
-                savingName ||
-                !nameDraft.trim() ||
-                nameDraft.trim() === teamName
-              }
-            >
-              {savingName ? "保存中…" : "保存名称"}
-            </Button>
-          </form>
+          <RenameForm kind="team" id={teamId} name={teamName} onRenamed={onRenamed} />
         ) : (
           <p className="mt-2 text-[14px] text-[var(--text)]">{teamName}</p>
         )}

@@ -77,7 +77,7 @@ test("the print list shows languages, duplicate counts, and level navigation", a
   page,
 }) => {
   const records = [
-    { id: printId, filename: "A.cpp", createdAt: Date.UTC(2026, 10, 21, 6, 32, 8), authorName: "甲" },
+    { id: printId, filename: "A.cpp", createdAt: Date.UTC(2026, 10, 21, 6, 32, 8), authorName: "长队员名".repeat(24) },
     { id: "8bbdea0a-7875-43b5-a248-3816ee98d783", filename: "gen.py", createdAt: Date.UTC(2026, 10, 21, 5, 56, 12), authorName: "乙" },
     { id: "4dbcb66d-d124-4ad7-96dc-45c17d478bf1", filename: "A.cpp", createdAt: Date.UTC(2026, 10, 21, 5, 10, 0), authorName: "甲" },
   ];
@@ -96,6 +96,13 @@ test("the print list shows languages, duplicate counts, and level navigation", a
     "href",
     `${contestPath}/print/${printId}`,
   );
+  const filename = list.getByText("A.cpp", { exact: true }).first();
+  for (const width of [767, 768, 1024]) {
+    await page.setViewportSize({ width, height: 900 });
+    const box = await filename.evaluate(el => ({ visible: el.clientWidth, full: el.scrollWidth }));
+    expect(box.visible).toBeGreaterThan(0);
+    expect(box.visible).toBe(box.full);
+  }
   await expect(list.getByText("14:32:08")).toBeVisible();
   await expect(list.getByText("第 2 次打印")).toBeVisible();
   await expect(list.getByText("C++").first()).toBeVisible();

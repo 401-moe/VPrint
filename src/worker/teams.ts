@@ -240,6 +240,6 @@ teamsRoutes.get("/workspace", async (context) => {
   return context.json({
     scope: "user",
     teams: results.map(({ selected, ...team }) => team),
-    selectedTeamId: (results.find(team => team.selected) ?? results[0])?.id ?? null,
+    selectedTeamId: results.find(team => team.selected)?.id ?? null,
   } satisfies WorkspaceData);
 });

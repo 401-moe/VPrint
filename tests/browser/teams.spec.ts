@@ -134,3 +134,98 @@ test("a long account name leaves the narrow header and its links usable", async 
   await account.click();
   await expect(page.getByRole("heading", { name: "账号设置" })).toBeVisible();
 });
+
+test("back during team creation dismisses the dialog and keeps the chosen page", async ({ page }) => {
+  await page.goto("/login");
+  await register(page, "建队者");
+  await createTeam(page, "原队伍");
+  const original = page.url();
+  await page.getByRole("link", { name: "返回所有队伍" }).click();
+  await page.getByRole("button", { name: "新建队伍" }).click();
+  await page.getByLabel("队伍名称").fill("后台创建的新队");
+
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/api/teams", async route => { await gate; await route.continue(); });
+  const request = page.waitForRequest("**/api/teams");
+  const response = page.waitForResponse("**/api/teams");
+  await page.getByRole("button", { name: "创建队伍" }).click();
+  await request;
+  try {
+    await page.goBack();
+    await expect(page).toHaveURL(original);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  } finally {
+    release();
+  }
+  expect((await response).status()).toBe(201);
+  await expect(page.getByRole("link", { name: "原队伍", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "返回所有队伍" }).click();
+  await expect(page.getByRole("list").getByRole("link", { name: /后台创建的新队/ })).toBeVisible();
+});
+
+test("visiting subpages remembers a team once and marks the last visit on the overview", async ({ page }) => {
+  await page.goto("/login");
+  await register(page, "多队队员");
+  const writes: string[] = [];
+  page.on("request", request => {
+    if (request.method() === "PUT" && request.url().endsWith("/selection")) writes.push(new URL(request.url()).pathname);
+  });
+  await createTeam(page, "甲队");
+  const first = new URL(page.url()).pathname;
+  await createContest(page, "周末");
+  await page.getByRole("link", { name: /周末/ }).click();
+  await page.getByRole("link", { name: "比赛设置" }).click();
+  await page.getByRole("link", { name: "返回打印列表" }).click();
+  await page.getByRole("link", { name: "返回比赛列表" }).click();
+  await page.getByRole("link", { name: "队伍设置" }).click();
+  await page.getByRole("link", { name: "所有队伍", exact: true }).click();
+  await expect(page.getByRole("link", { name: /甲队.*最近访问/ })).toBeVisible();
+  await createTeam(page, "乙队");
+  const second = new URL(page.url()).pathname;
+  await page.getByRole("link", { name: "返回所有队伍" }).click();
+  await expect(page.getByRole("link", { name: /乙队.*最近访问/ })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("link", { name: /乙队.*最近访问/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /甲队.*最近访问/ })).toHaveCount(0);
+  await page.getByRole("link", { name: /乙队.*最近访问/ }).click();
+  await expect(page.getByRole("heading", { name: "比赛列表" })).toBeVisible();
+  expect(writes).toEqual([first, second].map(path => path.replace("/team/", "/api/teams/") + "/selection"));
+});
+
+for (const kind of ["team", "contest"] as const) {
+  test(`a pending ${kind} rename preserves newer input`, async ({ page }) => {
+    await page.goto("/login");
+    await register(page, "队长");
+    await createTeam(page, "原队");
+    if (kind === "contest") {
+      await createContest(page, "原比赛");
+      await page.getByRole("link", { name: /原比赛/ }).click();
+    }
+    const label = kind === "team" ? "队伍" : "比赛";
+    await page.getByRole("link", { name: label + "设置" }).click();
+    const field = page.getByLabel(label + "名称", { exact: true });
+    const save = page.getByRole("button", { name: "保存名称" });
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const endpoint = `**/api/${kind}s/*`;
+    await page.route(endpoint, async route => { await gate; await route.continue(); }, { times: 1 });
+    await field.fill("第一版");
+    const request = page.waitForRequest(r => r.method() === "PATCH");
+    await save.click();
+    await request;
+    try {
+      await field.fill("第二版");
+    } finally {
+      release();
+    }
+    const breadcrumb = page.getByRole("banner").getByRole("link", { name: "第一版", exact: true });
+    await expect(breadcrumb).toBeVisible();
+    await expect(field).toHaveValue("第二版");
+    await save.click();
+    await expect(page.getByRole("banner").getByRole("link", { name: "第二版", exact: true })).toBeVisible();
+    await page.reload();
+    await expect(field).toHaveValue("第二版");
+    await expect(save).toBeDisabled();
+  });
+}

@@ -1,4 +1,4 @@
-import { type FormEvent, type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "./api";
 import { AccountSettings } from "./AccountSettings";
 import { ContestSettings, PrintList, PrintPage } from "./ContestPrints";
@@ -10,8 +10,6 @@ import { InvitePage } from "./InvitePage";
 import { BreadcrumbHeader } from "./Shell";
 import { TeamManagement } from "./TeamManagement";
 import { Button } from "./ui/button";
-import { DialogContent, DialogRoot } from "./ui/dialog";
-import { Input } from "./ui/input";
 import { usePrintNotifications } from "./use-print-notifications";
 import { contestPath, contestRoute, teamRoute } from "./workspace-routes";
 
@@ -59,16 +57,12 @@ export function Workspace({
   const data = snapshot?.key === queryKey ? snapshot.data : undefined;
   const team = data && data.scope !== "user" ? data.team : undefined;
   const contest = data?.scope === "contest" ? data.contest : undefined;
+  const selection = useRef<{ id: string; write: Promise<void> } | null>(null);
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision((v) => v + 1), []);
   const [failed, setFailed] = useState<{ key: string; denied: boolean } | null>(
     null,
   );
-  const [createTeamOpen, setCreateTeamOpen] = useState(false);
-  const [newTeamName, setNewTeamName] = useState("");
-  const [creatingTeam, setCreatingTeam] = useState(false);
-  const [createTeamError, setCreateTeamError] = useState("");
-
   const [listVersion, setListVersion] = useState(0);
   const [noticeId, setNoticeId] = useState("");
   const returnState = useRef<{
@@ -95,6 +89,9 @@ export function Workspace({
     })
       .then((value) => {
         if (controller.signal.aborted) return;
+        if (value.scope === "user" && value.selectedTeamId && !selection.current) {
+          selection.current = { id: value.selectedTeamId, write: Promise.resolve() };
+        }
         setSnapshot({ key: queryKey, data: value });
       })
       .catch((cause) => {
@@ -117,12 +114,23 @@ export function Workspace({
     return () => window.removeEventListener("popstate", restore);
   }, []);
 
+  const teamId = team?.id;
   useEffect(() => {
-    if (!team?.id) return;
-    // Remembering the team is a preference. Navigation succeeds independently.
-    void api(`/api/teams/${team.id}/selection`, { method: "PUT", body: "{}" })
-      .catch(() => undefined);
-  }, [team?.id]);
+    if (!teamId || selection.current?.id === teamId) return;
+    // Keep rapid team switches in visit order even if a write is slow.
+    const previous = selection.current?.write ?? Promise.resolve();
+    const write = previous.then(async () => {
+      try {
+        await api(`/api/teams/${teamId}/selection`, { method: "PUT", body: "{}" });
+        if (selection.current?.write === write && ["/workspace", "/teams"].includes(location.pathname)) {
+          refresh();
+        }
+      } catch {
+        if (selection.current?.write === write) selection.current = null;
+      }
+    });
+    selection.current = { id: teamId, write };
+  }, [teamId, refresh]);
 
   useEffect(() => {
     const titlePrefix = account
@@ -189,30 +197,23 @@ export function Workspace({
     navigate(url.pathname);
   }
 
-  function join(teamId: string) {
-    if (location.pathname === path) navigate(`/team/${teamId}`);
+  function enterTeam(teamId: string, form?: HTMLFormElement) {
+    if (location.pathname === path && (!form || form.isConnected)) navigate(`/team/${teamId}`);
     else refresh();
   }
 
-  async function createTeam(event: FormEvent) {
-    event.preventDefault();
-    const trimmed = newTeamName.trim();
-    if (!trimmed || creatingTeam) return;
-    setCreatingTeam(true);
-    setCreateTeamError("");
-    try {
-      const created = await api<{ id: string }>("/api/teams", {
-        method: "POST",
-        body: JSON.stringify({ name: trimmed }),
-      });
-      setCreateTeamOpen(false);
-      setNewTeamName("");
-      navigate(`/team/${created.id}`);
-    } catch {
-      setCreateTeamError("创建队伍失败，请重试。");
-    } finally {
-      setCreatingTeam(false);
-    }
+  function updateName(name: string) {
+    setSnapshot(current => {
+      if (current?.key !== queryKey) return current;
+      const { data } = current;
+      if (data.scope === "contest") {
+        return { ...current, data: { ...data, contest: { ...data.contest, name } } };
+      }
+      if (data.scope === "team-settings") {
+        return { ...current, data: { ...data, team: { ...data.team, name } } };
+      }
+      return current;
+    });
   }
 
   function updateInvitation(url: string) {
@@ -290,7 +291,7 @@ export function Workspace({
     }
 
     if (invite) {
-      return <InvitePage key={invite[1]} token={invite[1]} onJoined={join} />;
+      return <InvitePage key={invite[1]} token={invite[1]} onJoined={enterTeam} />;
     }
 
     if (!data) return loading();
@@ -301,6 +302,7 @@ export function Workspace({
       if (contestSettings) {
         return (
           <ContestSettings
+            key={contestId}
             contestId={contestId}
             contestHref={contestHref}
             contestName={contest.name}
@@ -308,7 +310,7 @@ export function Workspace({
             teamName={team.name}
             owner={team.role === "owner"}
             navigate={follow}
-            onUpdated={refresh}
+            onRenamed={updateName}
             onDeleted={() => {
               setSnapshot(undefined);
               refresh();
@@ -362,6 +364,7 @@ export function Workspace({
           memberName={member.name}
           invitationUrl={data.invitationUrl}
           onInvitationChange={updateInvitation}
+          onRenamed={updateName}
           onTeamChanged={refresh}
           onTeamDissolved={() => {
             setSnapshot(undefined);
@@ -388,10 +391,8 @@ export function Workspace({
       <UserTeamsPage
         memberName={member.name}
         teams={data.teams}
-        onOpenCreateTeam={() => {
-          setCreateTeamError("");
-          setCreateTeamOpen(true);
-        }}
+        selectedTeamId={data.selectedTeamId}
+        onCreated={enterTeam}
       />
     );
   }
@@ -417,68 +418,6 @@ export function Workspace({
       )}
 
       {renderContent()}
-
-      <DialogRoot
-        open={createTeamOpen}
-        onOpenChange={(next) => {
-          if (creatingTeam && !next) return;
-          setCreateTeamOpen(next);
-          if (!next) {
-            setNewTeamName("");
-            setCreateTeamError("");
-          }
-        }}
-      >
-        <DialogContent
-          title="新建队伍"
-          description="创建后你可以通过邀请链接邀请队友加入。"
-          dismissible={!creatingTeam}
-        >
-          <form onSubmit={createTeam} className="space-y-4">
-            <div>
-              <label
-                htmlFor="create-team-title"
-                className="mb-1.5 block text-[13px] font-medium text-[var(--text)]"
-              >
-                队伍名称
-              </label>
-              <Input
-                id="create-team-title"
-                name="team_title"
-                required
-                maxLength={100}
-                placeholder="例如：西安交大 · 集训一队"
-                value={newTeamName}
-                onChange={(e) => setNewTeamName(e.target.value)}
-                autoFocus
-              />
-            </div>
-
-            {createTeamError && (
-              <p className="text-[13px] text-[var(--negative)]" role="alert">
-                {createTeamError}
-              </p>
-            )}
-
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="secondary"
-                disabled={creatingTeam}
-                onClick={() => setCreateTeamOpen(false)}
-              >
-                取消
-              </Button>
-              <Button
-                variant="primary"
-                type="submit"
-                disabled={creatingTeam || !newTeamName.trim()}
-              >
-                创建队伍
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </DialogRoot>
     </div>
   );
 }

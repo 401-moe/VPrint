@@ -20,12 +20,46 @@ const timestamp = new Intl.DateTimeFormat("zh-CN", {
 export function UserTeamsPage({
   memberName,
   teams,
-  onOpenCreateTeam,
+  selectedTeamId,
+  onCreated,
 }: {
   memberName: string;
   teams: TeamSummary[];
-  onOpenCreateTeam: () => void;
+  selectedTeamId: string | null;
+  onCreated: (teamId: string, form: HTMLFormElement) => void;
 }) {
+  const [createTeamOpen, setCreateTeamOpen] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [creatingTeam, setCreatingTeam] = useState(false);
+  const [createTeamError, setCreateTeamError] = useState("");
+
+  async function createTeam(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const trimmed = newTeamName.trim();
+    if (!trimmed || creatingTeam) return;
+    setCreatingTeam(true);
+    setCreateTeamError("");
+    try {
+      const created = await api<{ id: string }>("/api/teams", {
+        method: "POST",
+        body: JSON.stringify({ name: trimmed }),
+      });
+      setCreateTeamOpen(false);
+      setNewTeamName("");
+      onCreated(created.id, form);
+    } catch {
+      setCreateTeamError("创建队伍失败，请重试。");
+    } finally {
+      setCreatingTeam(false);
+    }
+  }
+
+  function openCreateTeam() {
+    setCreateTeamError("");
+    setCreateTeamOpen(true);
+  }
+
   return (
     <main className="vp-page">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
@@ -45,7 +79,7 @@ export function UserTeamsPage({
             <Settings size={14} aria-hidden="true" />
             <span>账号设置</span>
           </a>
-          <Button variant="primary" onClick={onOpenCreateTeam}>
+          <Button variant="primary" onClick={openCreateTeam}>
             <Plus size={14} aria-hidden="true" />
             <span>新建队伍</span>
           </Button>
@@ -63,7 +97,7 @@ export function UserTeamsPage({
             <p className="text-[14px] text-[var(--muted)]">
               你还没有加入队伍。可以创建队伍，或打开队长发来的邀请链接。
             </p>
-            <Button variant="primary" onClick={onOpenCreateTeam}>
+            <Button variant="primary" onClick={openCreateTeam}>
               <Plus size={14} aria-hidden="true" />
               <span>新建队伍</span>
             </Button>
@@ -86,7 +120,7 @@ export function UserTeamsPage({
                       </span>
                     </div>
                     <p className="mt-1 text-[13px] text-[var(--faint)] vp-num">
-                      {team.memberCount} 名队员
+                      {team.memberCount} 名队员{team.id === selectedTeamId && " · 最近访问"}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3 text-[13px] text-[var(--muted)] vp-num">
@@ -103,6 +137,68 @@ export function UserTeamsPage({
           </ul>
         )}
       </section>
+
+      <DialogRoot
+        open={createTeamOpen}
+        onOpenChange={(next) => {
+          if (creatingTeam && !next) return;
+          setCreateTeamOpen(next);
+          if (!next) {
+            setNewTeamName("");
+            setCreateTeamError("");
+          }
+        }}
+      >
+        <DialogContent
+          title="新建队伍"
+          description="创建后你可以通过邀请链接邀请队友加入。"
+          dismissible={!creatingTeam}
+        >
+          <form onSubmit={createTeam} className="space-y-4">
+            <div>
+              <label
+                htmlFor="create-team-title"
+                className="mb-1.5 block text-[13px] font-medium text-[var(--text)]"
+              >
+                队伍名称
+              </label>
+              <Input
+                id="create-team-title"
+                name="team_title"
+                required
+                maxLength={100}
+                placeholder="例如：西安交大 · 集训一队"
+                value={newTeamName}
+                onChange={(e) => setNewTeamName(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            {createTeamError && (
+              <p className="text-[13px] text-[var(--negative)]" role="alert">
+                {createTeamError}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                disabled={creatingTeam}
+                onClick={() => setCreateTeamOpen(false)}
+              >
+                取消
+              </Button>
+              <Button
+                variant="primary"
+                type="submit"
+                disabled={creatingTeam || !newTeamName.trim()}
+              >
+                创建队伍
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </DialogRoot>
     </main>
   );
 }

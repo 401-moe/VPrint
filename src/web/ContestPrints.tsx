@@ -1,4 +1,5 @@
-import { type FormEvent, lazy, type MouseEventHandler, Suspense, useEffect, useRef, useState } from "react";
+import { RenameForm } from "./RenameForm";
+import { lazy, type MouseEventHandler, Suspense, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Settings, Terminal, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "./api";
@@ -6,7 +7,6 @@ import { languageForFilename } from "./file-language";
 import { Button, buttonClassName } from "./ui/button";
 import { CopyButton } from "./ui/copy-button";
 import { DialogContent, DialogRoot } from "./ui/dialog";
-import { Input } from "./ui/input";
 
 const examplePrintCommand = "vprint A.cpp";
 
@@ -229,7 +229,7 @@ export function PrintList({
                     className="ft-link flex w-full items-center justify-between gap-4 px-5 py-3 vp-hover-row min-h-[46px] pointer-coarse:min-h-[48px]"
                     href={`${contestHref}/print/${record.id}`}
                   >
-                    <span className="flex min-w-0 items-center gap-3">
+                    <span className="flex min-w-0 flex-1 items-center gap-3">
                       <time
                         dateTime={isoTimestamp(record.createdAt)}
                         className="shrink-0 text-[12px] text-[var(--faint)] vp-num"
@@ -246,13 +246,13 @@ export function PrintList({
                       )}
                     </span>
 
-                    <span className="flex shrink-0 items-center gap-3 text-[12px] text-[var(--muted)] vp-num">
+                    <span className="flex max-w-[35%] min-w-0 items-center gap-3 text-[12px] text-[var(--muted)] vp-num">
                       {record.authorName && (
-                        <span className="hidden md:inline">
+                        <span className="hidden truncate md:block" title={record.authorName}>
                           {record.authorName}
                         </span>
                       )}
-                      <span>{language}</span>
+                      <span className="shrink-0">{language}</span>
                     </span>
                   </a>
                 </li>
@@ -273,7 +273,7 @@ export function ContestSettings({
   teamName,
   owner,
   navigate,
-  onUpdated,
+  onRenamed,
   onDeleted,
 }: {
   contestId: string;
@@ -283,41 +283,15 @@ export function ContestSettings({
   teamName: string;
   owner: boolean;
   navigate: MouseEventHandler<HTMLAnchorElement>;
-  onUpdated: () => void;
+  onRenamed: (name: string) => void;
   onDeleted: () => void;
 }) {
-  const [nameDraft, setNameDraft] = useState(contestName);
-  const [saving, setSaving] = useState(false);
   const [deletePreview, setDeletePreview] =
     useState<ContestDeletePreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    setNameDraft(contestName);
-  }, [contestId, contestName]);
-
   const cliCommand = `vprint use --team ${teamId} --contest ${contestId}`;
-
-  async function saveContestName(event: FormEvent) {
-    event.preventDefault();
-    const trimmed = nameDraft.trim();
-    if (!trimmed || trimmed === contestName || saving) return;
-    setSaving(true);
-    setError("");
-    try {
-      await api(`/api/contests/${contestId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ name: trimmed }),
-      });
-      toast.success(`已保存比赛名称「${trimmed}」`);
-      onUpdated();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "保存比赛名称失败。");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function openDeleteDialog() {
     if (busy) return;
@@ -375,31 +349,7 @@ export function ContestSettings({
 
       <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5">
         <h2 className="text-[14px] font-semibold text-[var(--text)]">比赛名称</h2>
-        <form
-          onSubmit={saveContestName}
-          className="mt-3 flex items-center gap-2.5"
-        >
-          <label htmlFor="contest-name-field" className="sr-only">
-            比赛名称
-          </label>
-          <Input
-            id="contest-name-field"
-            name="contest_title"
-            maxLength={100}
-            value={nameDraft}
-            onChange={(e) => setNameDraft(e.target.value)}
-            className="min-w-0 flex-1"
-          />
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={
-              saving || !nameDraft.trim() || nameDraft.trim() === contestName
-            }
-          >
-            {saving ? "保存中…" : "保存名称"}
-          </Button>
-        </form>
+        <RenameForm kind="contest" id={contestId} name={contestName} onRenamed={onRenamed} />
       </section>
 
       <section className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 space-y-3">
@@ -590,7 +540,7 @@ export function PrintPage({
               <p className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-[var(--muted)] vp-num">
                 <span>{contestName}</span>
                 <span aria-hidden="true">·</span>
-                <span>{language}</span>
+                <span className="shrink-0">{language}</span>
                 <span aria-hidden="true">·</span>
                 <span>{lineCount} 行</span>
                 <span aria-hidden="true">·</span>
